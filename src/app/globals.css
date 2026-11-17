@@ -1,0 +1,169 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@source "../";
+
+@theme inline {
+  --font-sans: var(--font-funnel-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-funnel-display), var(--font-funnel-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-ink: var(--warn-ink);
+}
+
+/* DWM Clip: white page, dark green-grey text, one teal accent. No gradients, no glass. */
+:root {
+  --canvas: #f6f7f6;
+  --surface: #ffffff;
+  --subtle: #eef0ef;
+  --line: #e2e6e4;
+  --line-strong: #cbd2cf;
+  --ink: #14201e;
+  --ink-2: #33423f;
+  --muted: #5f6d69;
+  --brand: #0e9384;
+  --brand-ink: #0a6f64;
+  --brand-soft: #e3f4f1;
+  --success: #1f7a4d;
+  --danger: #b3382c;
+  --danger-soft: #fbeae7;
+  --warn-soft: #fdf3dc;
+  --warn-ink: #7a5a12;
+  color-scheme: light;
+
+  /* HeroUI theme tokens, mapped onto the palette above. Light only. */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --surface-foreground: var(--ink);
+  --surface-secondary: var(--subtle);
+  --surface-secondary-foreground: var(--ink);
+  --surface-tertiary: var(--line);
+  --surface-tertiary-foreground: var(--ink);
+  --overlay: var(--surface);
+  --overlay-foreground: var(--ink);
+  --accent: var(--brand);
+  --accent-foreground: #ffffff;
+  --accent-hover: var(--brand-ink);
+  --default: var(--subtle);
+  --default-foreground: var(--ink);
+  --default-hover: var(--line);
+  --border: var(--line);
+  --separator: var(--line);
+  --field-background: var(--surface);
+  --field-foreground: var(--ink);
+  --field-placeholder: color-mix(in srgb, var(--muted) 75%, transparent);
+  --field-border: var(--line-strong);
+  --field-border-width: 1px;
+  --field-border-hover: #aab4b0;
+  --field-border-focus: var(--brand);
+  --field-hover: var(--surface);
+  --field-focus: var(--surface);
+  --field-radius: 0.75rem;
+  --field-shadow: 0 0 #0000;
+  --focus: var(--brand);
+  --link: var(--brand-ink);
+  --danger-foreground: #fff;
+  --success-foreground: #fff;
+  --backdrop: rgb(20 32 30 / 0.5);
+  --surface-shadow: 0 1px 2px rgb(20 32 30 / 0.05);
+  --overlay-shadow: 0 0 0 1px rgb(20 32 30 / 0.06), 0 24px 60px -24px rgb(20 32 30 / 0.35);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: #bfe8e1;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .button {
+    @apply rounded-xl text-[15px] font-medium;
+  }
+
+  .button--sm {
+    @apply h-9 px-3.5 text-[13.5px] md:h-9;
+  }
+
+  .button--md {
+    @apply h-11 px-5 md:h-11;
+  }
+
+  .button--lg {
+    @apply h-12 px-6 text-[16px] md:h-12;
+  }
+
+  /* A white box with a hairline border: the one container style used everywhere. */
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+  /* One choice out of a few, shown side by side. */
+  .seg {
+    @apply inline-flex rounded-xl border border-line-strong bg-surface p-0.5;
+  }
+
+  .seg > button {
+    @apply rounded-[10px] px-3 py-1.5 text-[13.5px] text-ink-2 transition-colors;
+  }
+
+  .seg > button[aria-pressed="true"] {
+    @apply bg-ink text-white;
+  }
+
+  .field-native {
+    @apply h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 text-[15px] text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar-moving {
+    background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: bar-slide 1.4s linear infinite;
+  }
+
+  @keyframes bar-slide {
+    from {
+      background-position: -40% 0;
+    }
+    to {
+      background-position: 140% 0;
+    }
+  }
+}

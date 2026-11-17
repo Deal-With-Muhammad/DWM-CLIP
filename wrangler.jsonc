@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // DWM Clip on Cloudflare Workers (pages built by OpenNext), database on D1, clips on R2.
+  // Deploy with `npm run cf:deploy`. The clip engine (engine/) runs separately; ENGINE_URL points at it.
+  "name": "dwm-clip",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "clip.dealwithmuhammad.com", "custom_domain": true }],
+  "d1_databases": [{ "binding": "DB", "database_name": "dwm-clip", "database_id": "37d5060e-38cf-42ff-a6f7-447c8600dedc", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "dwm-clip-media" }],
+  "vars": {
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_FROM": "me@dealwithmuhammad.com",
+    // "Our AI" for Pro: the cheapest model that still picks good moments.
+    "AI_PROVIDER": "gemini",
+    "AI_MODEL": "gemini-3.5-flash-lite,gemini-2.5-flash-lite"
+  }
+  // Secrets (set once with `npx wrangler secret put NAME`):
+  //   ADMIN_EMAILS                   who may open /admin (comma separated)
+  //   SESSION_SECRET                 signs sign-in cookies and locks saved AI keys; any long random string
+  //   SMTP_USER, SMTP_PASS           the Gmail address + app password that send sign-in codes
+  //   AI_KEY                         the Gemini key used for Pro members
+  //   ENGINE_URL, ENGINE_SECRET      where the clip engine runs, and the password it shares with this site
+  //   LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_WEBHOOK_SECRET, LEMONSQUEEZY_STORE_ID,
+  //   LEMONSQUEEZY_VARIANT_PRO, LEMONSQUEEZY_VARIANT_STORAGE
+}

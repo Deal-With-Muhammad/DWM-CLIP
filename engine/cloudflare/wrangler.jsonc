@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The clip engine on Cloudflare Containers: one container per video, started when the website
+  // sends a job and stopped when the clips are made. Needs the Workers Paid plan and Docker.
+  //   cd engine/cloudflare && npx wrangler deploy
+  //   npx wrangler secret put ENGINE_SECRET      (the same value as on the dwm-clip Worker)
+  // Then on the website:  npx wrangler secret put ENGINE_URL   (this Worker's https address)
+  "name": "dwm-clip-engine",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "ClipEngine",
+      "scheduling_policy": "durable_object",
+      "max_instances": 5,
+      "images": { "base": { "dockerfile": "../Dockerfile" } }
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "ENGINE", "class_name": "ClipEngine" }] },
+  "exports": { "ClipEngine": { "type": "durable-object", "storage": "sqlite" } }
+  // Optional secret: YTDLP_PROXY, an http(s) proxy address used for downloads when YouTube
+  // turns away Cloudflare's addresses ("sign in to confirm you're not a bot").
+}
