@@ -36,6 +36,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <Link href="/terms" className="hover:text-ink">
           Terms
         </Link>
+        <Link href="/refund" className="hover:text-ink">
+          Refunds
+        </Link>
       </nav>
     </main>
   );

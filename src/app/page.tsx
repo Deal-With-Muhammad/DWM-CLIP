@@ -26,7 +26,7 @@ const FAQ = [
   { q: "How long does it take?", a: "A 10-minute video takes about two minutes. An hour-long stream takes around ten. Clips appear one by one as they finish, so you can start posting before the whole video is done." },
   { q: "Is it only for GTA 6?", a: "No. It knows GTA VI and 20 other games by name, so the titles and hashtags fit the game, but it works on any video where something happens or someone talks." },
   { q: "What happens when my storage is full?", a: "New clips aren't saved until you delete some or add storage. Download the clips you want to keep, delete them here, and the space is yours again." },
-  { q: "Can I cancel Pro?", a: "Yes, any time, from Settings. You keep Pro until the end of the month you paid for." },
+  { q: "Can I cancel Pro?", a: "Yes, any time, from Settings. You keep Pro until the end of the month you paid for. If it didn't work for you, ask within 14 days of a payment and you get that payment back." },
 ];
 
 export default async function Home() {
@@ -211,11 +211,17 @@ export default async function Home() {
             </a>
           </span>
           <span className="ms-auto flex gap-5">
+            <a href="#pricing" className="hover:text-ink">
+              Pricing
+            </a>
             <Link href="/terms" className="hover:text-ink">
               Terms
             </Link>
             <Link href="/privacy" className="hover:text-ink">
               Privacy
+            </Link>
+            <Link href="/refund" className="hover:text-ink">
+              Refunds
             </Link>
             <a href={`mailto:${site.contact}`} className="hover:text-ink">
               Contact

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { acceptsTestOrders, parseSubscription, verifySignature } from "@/lib/server/billing";
-import { first, nowIso, run } from "@/lib/server/db";
+import { parseSubscription, verifySignature } from "@/lib/server/billing";
+import { batch, first, nowIso, run, stmt } from "@/lib/server/db";
 
-// Lemon Squeezy calls this whenever a subscription starts, renews, is cancelled or ends.
-// The row it keeps is what gives a member Pro and extra storage (see lib/server/account.ts).
+// Paddle calls this whenever a subscription starts, renews, changes, is cancelled or ends.
+// The rows it keeps are what give a member Pro and extra storage (see lib/server/account.ts).
 export async function POST(req: Request) {
   const raw = await req.text();
-  if (!verifySignature(raw, req.headers.get("x-signature"))) return NextResponse.json({ error: "bad signature" }, { status: 401 });
+  if (!verifySignature(raw, req.headers.get("paddle-signature"))) return NextResponse.json({ error: "bad signature" }, { status: 401 });
   let payload: unknown;
   try {
     payload = JSON.parse(raw);
@@ -15,34 +15,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad body" }, { status: 400 });
   }
   const s = parseSubscription(payload);
-  if (!s) return NextResponse.json({ ok: true, ignored: true }); // orders, invoices: nothing to do
+  if (!s) return NextResponse.json({ ok: true, ignored: true }); // transactions, customers: nothing to do
   const at = nowIso();
-  if (s.testMode && !acceptsTestOrders()) {
-    await run("insert into billing_events (at, event, user_id, detail) values (?, ?, ?, ?)", at, s.event, s.userId, "test-mode payment ignored");
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-  // The member's id travels with the checkout. If it's missing (a subscription made by hand in the dashboard), match by email.
+
+  // The member's id travels with the checkout. Later events for the same subscription may not carry it, so fall back to what's stored.
   let userId = s.userId && (await first("select id from users where id = ?", s.userId)) ? s.userId : null;
-  if (!userId && s.email) userId = (await first<{ id: string }>("select id from users where email = ?", s.email.toLowerCase()))?.id ?? null;
-  if (!userId || !s.kind) {
-    await run("insert into billing_events (at, event, user_id, detail) values (?, ?, ?, ?)", at, s.event, userId, `not matched: subscription ${s.id}, ${s.email ?? "no email"}`);
+  if (!userId) userId = (await first<{ user_id: string }>("select user_id from subscriptions where id like ? limit 1", `${s.id}:%`))?.user_id ?? null;
+  const ours = s.items.filter((i) => i.kind);
+  if (!userId || ours.length === 0) {
+    await run("insert into billing_events (at, event, user_id, detail) values (?, ?, ?, ?)", at, s.event, userId, `not matched: subscription ${s.id}`);
     return NextResponse.json({ ok: true, unmatched: true });
   }
-  await run(
-    `insert into subscriptions (id, user_id, kind, quantity, status, renews_at, ends_at, portal_url, test_mode, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     on conflict (id) do update set kind = excluded.kind, quantity = excluded.quantity, status = excluded.status, renews_at = excluded.renews_at,
-       ends_at = excluded.ends_at, portal_url = coalesce(excluded.portal_url, portal_url), updated_at = excluded.updated_at`,
-    s.id,
-    userId,
-    s.kind,
-    s.quantity,
-    s.status,
-    s.renewsAt,
-    s.endsAt,
-    s.portal,
-    s.testMode,
-    at,
-  );
-  await run("insert into billing_events (at, event, user_id, detail) values (?, ?, ?, ?)", at, s.event, userId, `${s.kind} x${s.quantity}: ${s.status}${s.testMode ? " (test)" : ""}`);
+
+  // One row per thing subscribed to. Anything no longer on the subscription is removed.
+  await batch([
+    stmt("delete from subscriptions where id like ?", `${s.id}:%`),
+    ...ours.map((i) =>
+      stmt(
+        "insert into subscriptions (id, user_id, kind, quantity, status, renews_at, ends_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
+        `${s.id}:${i.priceId}`,
+        userId,
+        i.kind,
+        i.quantity,
+        s.status,
+        s.renewsAt,
+        s.endsAt,
+        at,
+      ),
+    ),
+    stmt("insert into billing_events (at, event, user_id, detail) values (?, ?, ?, ?)", at, s.event, userId, `${ours.map((i) => `${i.kind} x${i.quantity}`).join(", ")}: ${s.status}${s.endsAt ? `, ends ${s.endsAt.slice(0, 10)}` : ""}`),
+  ]);
   return NextResponse.json({ ok: true });
 }

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { FREE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
-import { paymentsEnabled } from "@/lib/server/billing";
+import { checkoutConfig, paymentsEnabled, portalUrl } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
@@ -18,6 +18,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const [account, key, q] = await Promise.all([accountOf(user), keyInfo(user.id), searchParams]);
   const pro = account.plan === "pro";
   const canPay = paymentsEnabled("pro");
+  const paddle = checkoutConfig();
+  const checkout = { sandbox: paddle.sandbox, token: paddle.token, userId: user.id, email: user.email };
+  const portal = portalUrl();
   return (
     <>
       <AppHeader email={user.email} plan={account.plan} admin={isAdminEmail(user.email)} />
@@ -45,9 +48,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 {account.proEnds && ` Your plan is cancelled and stays on until ${new Date(account.proEnds).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`}
               </p>
               <div className="mt-4 flex flex-wrap gap-2.5">
-                <PayButton kind="storage" label={`Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`} disabled={!paymentsEnabled("storage")} variant="outline" />
-                {account.portal && (
-                  <a href={account.portal} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-xl px-4 text-[15px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
+                {paymentsEnabled("storage") && <PayButton kind="storage" priceId={paddle.prices.storage} checkout={checkout} label={`Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`} variant="outline" />}
+                {portal && (
+                  <a href={portal} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-xl px-4 text-[15px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
                     Manage or cancel
                   </a>
                 )}
@@ -73,9 +76,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <li>1080p, videos up to {PRO.maxHours} hours, {PRO.clipsPerVideo} clips per video</li>
                 </ul>
                 <div className="mt-4">
-                  <PayButton kind="pro" label={`Go Pro for $${PRO.price}/month`} disabled={!canPay} />
+                  <PayButton kind="pro" priceId={paddle.prices.pro} checkout={checkout} label={`Go Pro for $${PRO.price}/month`} />
                 </div>
-                <p className="mt-2 text-[12.5px] text-muted">{canPay ? "Cancel any time. Payment is handled by Lemon Squeezy." : "Card payments open soon. Email me@dealwithmuhammad.com to get Pro now."}</p>
+                <p className="mt-2 text-[12.5px] text-muted">{canPay ? "Cancel any time. Payment is handled by Paddle, our reseller." : "Card payments open soon."}</p>
               </div>
             </div>
           )}

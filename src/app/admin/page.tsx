@@ -34,7 +34,6 @@ export default async function AdminPage() {
 
   const since = ago(DAYS);
   const week = ago(7);
-  const now = ago(0);
   const [account, totals, subs, signups, clipDays, jobDays, users, jobs, events] = await Promise.all([
     accountOf(user),
     first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; tokens: number; active7: number }>(
@@ -46,20 +45,18 @@ export default async function AdminPage() {
       week,
     ),
     all<{ kind: string; n: number }>(
-      "select kind, coalesce(sum(quantity), 0) as n from subscriptions where test_mode = 0 and (status in ('active', 'on_trial', 'past_due') or (status = 'cancelled' and ends_at > ?)) group by kind",
-      now,
+      "select kind, coalesce(sum(quantity), 0) as n from subscriptions where status in ('active', 'trialing', 'past_due') group by kind",
     ),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from users where created_at > ? group by day", since),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from clips where created_at > ? group by day", since),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from jobs where created_at > ? group by day", since),
     all<{ id: string; email: string; created_at: string; plan_override: string | null; bonus_bytes: number; pro: number; clips: number; bytes: number; jobs: number }>(
       `select u.id, u.email, u.created_at, u.plan_override, u.bonus_bytes,
-        (select count(*) from subscriptions s where s.user_id = u.id and s.kind = 'pro' and (s.status in ('active', 'on_trial', 'past_due') or (s.status = 'cancelled' and s.ends_at > ?1))) as pro,
+        (select count(*) from subscriptions s where s.user_id = u.id and s.kind = 'pro' and s.status in ('active', 'trialing', 'past_due')) as pro,
         (select coalesce(sum(clips), 0) from usage g where g.user_id = u.id) as clips,
         (select coalesce(sum(bytes), 0) from clips c where c.user_id = u.id) as bytes,
         (select count(*) from jobs j where j.user_id = u.id) as jobs
        from users u order by u.created_at desc limit 100`,
-      now,
     ),
     all<{ id: string; email: string; title: string; url: string; status: string; error: string | null; ai_mode: string; found: number; created_at: string }>(
       "select j.id, u.email, j.title, j.url, j.status, j.error, j.ai_mode, j.found, j.created_at from jobs j join users u on u.id = j.user_id order by j.created_at desc limit 25",

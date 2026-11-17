@@ -8,7 +8,7 @@ export default function Terms() {
     <Legal title="Terms" updated="18 November 2026">
       <section>
         <h2>What DWM Clip is</h2>
-        <p>DWM Clip turns a video you give it a link to into short vertical clips. It is run by Muhammad Ahmad (dealwithmuhammad.com). By using it you agree to these terms.</p>
+        <p>DWM Clip turns a video you give it a link to into short vertical clips. It is operated by Muhammad Ahmad, trading as Deal With Muhammad (dealwithmuhammad.com), referred to here as &quot;we&quot;. By using it you agree to these terms.</p>
       </section>
       <section>
         <h2>Videos you clip</h2>
@@ -26,7 +26,10 @@ export default function Terms() {
       </section>
       <section>
         <h2>Payments and refunds</h2>
-        <p>Payments are handled by Lemon Squeezy, who is the seller of record. You can cancel any time from Settings and keep Pro until the end of the paid month. If something didn&apos;t work, email within 7 days of the charge and you&apos;ll get a refund.</p>
+        <p>
+          Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns. You can cancel any time from Settings and keep Pro until the end
+          of the paid month. Refunds are covered by the <a href="/refund" className="text-brand-ink underline underline-offset-4">refund policy</a>.
+        </p>
       </section>
       <section>
         <h2>Your AI key</h2>

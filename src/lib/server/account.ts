@@ -1,16 +1,16 @@
 import "server-only";
 
 import { FREE, PRO, STORAGE_PACK } from "@/lib/plans";
-import { all, first, nowIso } from "@/lib/server/db";
+import { all, first } from "@/lib/server/db";
 import type { User } from "@/lib/server/session";
 
 // What a member may do right now: their plan, storage and clips left. Worked out
 // from the subscriptions table on every request, so a cancelled plan stops by itself.
 
-type Sub = { id: string; kind: "pro" | "storage"; quantity: number; status: string; renews_at: string | null; ends_at: string | null; portal_url: string | null };
+type Sub = { id: string; kind: "pro" | "storage"; quantity: number; status: string; renews_at: string | null; ends_at: string | null };
 
-/** A subscription that still counts: paid up, or cancelled but inside the time already paid for. */
-const live = (s: Sub, now: string) => ["active", "on_trial", "past_due"].includes(s.status) || (s.status === "cancelled" && Boolean(s.ends_at) && s.ends_at! > now);
+/** A subscription that still counts. A cancelled one stays "active" at Paddle until the time already paid for runs out. */
+const live = (s: Sub) => ["active", "trialing", "past_due"].includes(s.status);
 
 export const month = () => new Date().toISOString().slice(0, 7);
 
@@ -27,19 +27,16 @@ export type Account = {
   maxHours: number;
   jobsAtOnce: number;
   storagePacks: number;
-  /** Where a paying member manages or cancels the subscription. */
-  portal: string | null;
   proEnds: string | null;
 };
 
 export async function accountOf(user: User): Promise<Account> {
-  const now = nowIso();
   const [subs, used, usage] = await Promise.all([
-    all<Sub>("select id, kind, quantity, status, renews_at, ends_at, portal_url from subscriptions where user_id = ?", user.id),
+    all<Sub>("select id, kind, quantity, status, renews_at, ends_at from subscriptions where user_id = ?", user.id),
     first<{ n: number }>("select coalesce(sum(bytes), 0) as n from clips where user_id = ?", user.id),
     all<{ month: string; clips: number }>("select month, clips from usage where user_id = ?", user.id),
   ]);
-  const active = subs.filter((s) => live(s, now));
+  const active = subs.filter(live);
   const proSub = active.find((s) => s.kind === "pro");
   const pro = Boolean(proSub) || user.plan_override === "pro";
   const packs = pro ? active.filter((s) => s.kind === "storage").reduce((n, s) => n + Math.max(1, s.quantity), 0) : 0;
@@ -56,7 +53,6 @@ export async function accountOf(user: User): Promise<Account> {
     maxHours: limits.maxHours,
     jobsAtOnce: limits.jobsAtOnce,
     storagePacks: packs,
-    portal: proSub?.portal_url ?? active[0]?.portal_url ?? null,
-    proEnds: proSub?.status === "cancelled" ? proSub.ends_at : null,
+    proEnds: proSub?.ends_at ?? null,
   };
 }

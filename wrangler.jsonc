@@ -24,6 +24,6 @@
   //   SMTP_USER, SMTP_PASS           the Gmail address + app password that send sign-in codes
   //   AI_KEY                         the Gemini key used for Pro members
   //   ENGINE_URL, ENGINE_SECRET      where the clip engine runs, and the password it shares with this site
-  //   LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_WEBHOOK_SECRET, LEMONSQUEEZY_STORE_ID,
-  //   LEMONSQUEEZY_VARIANT_PRO, LEMONSQUEEZY_VARIANT_STORAGE
+  //   PADDLE_CLIENT_TOKEN, PADDLE_PRICE_PRO, PADDLE_PRICE_STORAGE, PADDLE_WEBHOOK_SECRET,
+  //   PADDLE_PORTAL_URL, and PADDLE_ENV=sandbox while testing (see src/lib/server/billing.ts)
 }
