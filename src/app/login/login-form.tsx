@@ -203,7 +203,7 @@ function CodeBoxes({ ref, value, disabled, onChange }: { ref: React.Ref<HTMLInpu
           return (
             <span
               key={i}
-              className={`grid h-14 place-items-center rounded-xl border bg-surface font-display text-[24px] tabular-nums transition-colors ${active ? "border-brand ring-3 ring-brand/20" : value[i] ? "border-ink/40" : "border-line-strong"}`}
+              className={`grid h-14 place-items-center rounded-xl bg-subtle font-display text-[24px] tabular-nums transition-shadow ${active ? "ring-2 ring-brand" : ""}`}
             >
               {value[i] ?? ""}
             </span>

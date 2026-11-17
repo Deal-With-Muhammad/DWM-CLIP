@@ -11,7 +11,7 @@ const CHIP: Record<PlanId, string> = { free: "bg-subtle text-ink-2", lite: "bg-v
 /** The bar across the signed-in pages. */
 export function AppHeader({ email, plan, planName, admin }: { email: string; plan: PlanId; planName: string; admin: boolean }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-surface">
+    <header className="sticky top-0 z-30 bg-canvas">
       <div className="mx-auto flex h-14 w-full max-w-[1080px] items-center gap-3 px-4 sm:px-6">
         <Logo href="/app" />
         <Link href="/app/settings#plan" className={`rounded-md px-1.5 py-0.5 text-[12px] font-semibold ${CHIP[plan]}`}>

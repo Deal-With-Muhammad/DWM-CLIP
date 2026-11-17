@@ -10,13 +10,13 @@ import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
 const FEATURES = [
-  { icon: Sparkles, tint: "bg-brand-soft text-brand-ink", title: "Finds the moments for you", text: "It reads what was said and listens for the loud parts, then picks the moments a stranger would stop scrolling for. Each one gets a score." },
+  { icon: Sparkles, tint: "bg-pink-soft text-pink", title: "Finds the moments for you", text: "It reads what was said and listens for the loud parts, then picks the moments a stranger would stop scrolling for. Each one gets a score." },
   { icon: Captions, tint: "bg-violet-soft text-violet", title: "Captions, word by word", text: "Three caption styles, timed to the voice, with the word being said lit up. Or switch captions off." },
   { icon: MessageSquareText, tint: "bg-sky-soft text-sky", title: "A hook on every clip", text: "A short line at the top taken from what happened: \"1 VS 3\", \"HE GOT ME\". You can rewrite it any time." },
   { icon: Wand2, tint: "bg-violet-soft text-violet", title: "Tell it what you want", text: "\"Only funny moments.\" \"Police chases.\" \"Titles in Spanish.\" Type it in and the AI looks for exactly that." },
-  { icon: SquarePen, tint: "bg-brand-soft text-brand-ink", title: "Change a clip after it's made", text: "New hook, another caption style, start two seconds earlier, end a little later. Save, and the clip is made again." },
+  { icon: SquarePen, tint: "bg-pink-soft text-pink", title: "Change a clip after it's made", text: "New hook, another caption style, start two seconds earlier, end a little later. Save, and the clip is made again." },
   { icon: Video, tint: "bg-sky-soft text-sky", title: "The streamer stays in the picture", text: "If the video has a webcam box, it's kept in the corner of the clip. If it doesn't, the game simply fills the screen." },
-  { icon: Hash, tint: "bg-brand-soft text-brand-ink", title: "Titles and hashtags that fit", text: "Every clip comes with a title, a description and the tags people search for. It knows GTA VI and 20 more games by name." },
+  { icon: Hash, tint: "bg-pink-soft text-pink", title: "Titles and hashtags that fit", text: "Every clip comes with a title, a description and the tags people search for. It knows GTA VI and 20 more games by name." },
   { icon: Scissors, tint: "bg-violet-soft text-violet", title: "Long streams are fine", text: "Videos up to three hours. It only fetches the parts it clips, so an hour-long stream takes minutes." },
 ];
 
@@ -58,7 +58,7 @@ export default async function Home() {
   ];
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-line bg-canvas">
+      <header className="sticky top-0 z-30 bg-canvas">
         <div className="mx-auto flex h-16 w-full max-w-[1080px] items-center gap-1 px-4 sm:px-6">
           <Logo />
           <nav className="ms-auto flex items-center gap-0.5 text-[14.5px]">
@@ -113,7 +113,7 @@ export default async function Home() {
                 ))}
                 to
                 {["TikTok", "Reels", "Shorts"].map((x) => (
-                  <span key={x} className="rounded-md bg-tile-pink px-2 py-0.5 font-medium text-white">
+                  <span key={x} className="rounded-md bg-tile-violet px-2 py-0.5 font-medium text-white">
                     {x}
                   </span>
                 ))}
@@ -123,7 +123,7 @@ export default async function Home() {
           </div>
         </section>
 
-        <section id="features" className="scroll-mt-16 border-y border-line bg-surface">
+        <section id="features" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="max-w-[560px] font-display text-[32px] leading-tight">Everything a clip needs, done before you open it</h2>
             <ul className="mt-10 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
@@ -145,7 +145,7 @@ export default async function Home() {
           <ol className="mt-9 grid gap-8 md:grid-cols-3">
             <li>
               <div className="card p-3.5">
-                <div className="flex h-10 items-center rounded-lg border border-line-strong bg-canvas px-3 text-[13px] text-muted">youtube.com/watch?v=…</div>
+                <div className="flex h-10 items-center rounded-lg bg-canvas px-3 text-[13px] text-muted">youtube.com/watch?v=…</div>
                 <div className="mt-2.5 rounded-lg bg-violet-soft px-3 py-2 text-[12.5px] text-violet">Only the funny moments</div>
               </div>
               <h3 className="mt-4 text-[17px] font-semibold">1. Paste the link</h3>
@@ -167,8 +167,8 @@ export default async function Home() {
                 <p className="mt-1 text-[12.5px] text-brand-ink">#GTA6 #ViceCity #RockstarGames</p>
                 <div className="mt-2.5 flex gap-2 text-[12.5px]">
                   <span className="rounded-lg bg-brand px-2.5 py-1 font-medium text-white">Download</span>
-                  <span className="rounded-lg border border-line-strong px-2.5 py-1">Copy caption</span>
-                  <span className="rounded-lg border border-line-strong px-2.5 py-1">Edit</span>
+                  <span className="rounded-lg bg-subtle px-2.5 py-1">Copy caption</span>
+                  <span className="rounded-lg bg-subtle px-2.5 py-1">Edit</span>
                 </div>
               </div>
               <h3 className="mt-4 text-[17px] font-semibold">3. Download and post</h3>
@@ -177,7 +177,7 @@ export default async function Home() {
           </ol>
         </section>
 
-        <section id="pricing" className="scroll-mt-16 border-y border-line bg-surface">
+        <section id="pricing" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="font-display text-[32px]">Pricing</h2>
             <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">Start free. Pay when you want more clips and don&apos;t want to think about AI keys. Cancel any time.</p>
@@ -185,10 +185,10 @@ export default async function Home() {
               {plans.map(({ plan, line, cta, href, rows }) => {
                 const best = plan.id === "pro";
                 return (
-                  <div key={plan.id} className={`flex flex-col rounded-2xl p-6 ${best ? "border-2 border-brand" : "border border-line"}`}>
+                  <div key={plan.id} className={`flex flex-col rounded-2xl p-6 ${best ? "bg-brand-soft" : "bg-canvas"}`}>
                     <p className="flex items-center gap-2 text-[17px] font-semibold">
                       {plan.name}
-                      {best && <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[12px] font-semibold text-brand-ink">Most clips</span>}
+                      {best && <span className="rounded-md bg-brand px-1.5 py-0.5 text-[12px] font-semibold text-white">Most clips</span>}
                     </p>
                     <p className="mt-2 font-display text-[38px] leading-none">
                       ${plan.price}
@@ -218,9 +218,9 @@ export default async function Home() {
 
         <section className="mx-auto w-full max-w-[760px] px-4 py-16 sm:px-6">
           <h2 className="font-display text-[32px]">Questions</h2>
-          <div className="mt-6 divide-y divide-line border-y border-line">
+          <div className="mt-6 space-y-2.5">
             {FAQ.map((f) => (
-              <details key={f.q} className="group py-4">
+              <details key={f.q} className="group rounded-2xl bg-surface px-5 py-4">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16.5px] font-medium [&::-webkit-details-marker]:hidden">
                   {f.q}
                   <span className="text-[20px] leading-none text-muted transition-transform group-open:rotate-45">+</span>
@@ -241,7 +241,7 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
+      <footer>
         <div className="mx-auto flex w-full max-w-[1080px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-6 text-[13.5px] text-muted sm:px-6">
           <span>
             {site.name}, by{" "}

@@ -50,7 +50,7 @@ function LookPicker({ look, onChange }: { look: Look; onChange: (l: Look) => voi
   const words = look.upper ? ["NO", "WAY", "BRO"] : ["No", "way", "bro"];
   const px = look.size === "s" ? 17 : look.size === "l" ? 25 : 21;
   return (
-    <div className="rise mt-3 space-y-3 rounded-xl border border-line bg-canvas p-3.5">
+    <div className="rise mt-3 space-y-3 rounded-xl bg-canvas p-3.5">
       <div
         aria-hidden
         className={`flex h-[92px] rounded-lg bg-[#241c3f] px-3 ${look.position === "top" ? "items-start pt-2.5" : look.position === "middle" ? "items-center" : "items-end pb-2.5"} justify-center`}
@@ -127,11 +127,11 @@ function Colour({ label, value, onChange }: { label: string; value: string; onCh
             aria-label={`${label} #${c}`}
             aria-pressed={value === c}
             onClick={() => onChange(c)}
-            className={`size-7 rounded-full border-2 transition-transform hover:scale-110 ${value === c ? "border-brand" : "border-line-strong"}`}
+            className={`size-7 rounded-full shadow-[inset_0_0_0_1px_rgb(23_18_43/0.14)] ring-2 ring-offset-2 ring-offset-canvas transition-transform hover:scale-110 ${value === c ? "ring-brand" : "ring-transparent"}`}
             style={{ background: `#${c}` }}
           />
         ))}
-        <label className="relative grid size-7 cursor-pointer place-items-center rounded-full border-2 border-dashed border-line-strong text-[13px] text-muted" title="Any other colour">
+        <label className="relative grid size-7 cursor-pointer place-items-center rounded-full bg-subtle text-[14px] text-ink-2" title="Any other colour">
           +
           <input type="color" value={`#${value}`} onChange={(e) => onChange(e.target.value.replace("#", "").toLowerCase())} className="absolute inset-0 cursor-pointer opacity-0" aria-label={`${label}: any other colour`} />
         </label>

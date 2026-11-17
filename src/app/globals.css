@@ -19,6 +19,8 @@
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
   --color-violet: var(--violet);
   --color-violet-soft: var(--violet-soft);
   --color-sky: var(--sky);
@@ -33,8 +35,9 @@
   --color-tile-sky: #1a8fd1;
 }
 
-/* DWM Clip: aurora colours (pink, violet, sky blue) used flat, never as gradients.
-   Pink is the one colour for actions; violet and sky mark secondary things.
+/* DWM Clip: aurora colours (violet, sky blue, a little pink) used flat, never as gradients.
+   Violet, the logo's colour, is the one colour for actions. Pink is kept for a few small accents.
+   Nothing is outlined: boxes are told apart by their fill and a soft shadow.
    Light by default; the dark theme is the same tokens with other values. */
 :root {
   /* A soft lilac page with slightly lighter cards: never plain white, which glares. */
@@ -46,12 +49,16 @@
   --ink: #17122b;
   --ink-2: #3d3657;
   --muted: #6b6485;
-  --brand: #d81b84;
-  --brand-hover: #b9146f;
-  --brand-ink: #b3126b;
-  --brand-soft: #fde6f2;
+  --brand: #6d3df0;
+  --brand-hover: #5a2cd6;
+  --brand-ink: #5a2cd6;
+  --brand-soft: #e4dafc;
+  --pink: #c9167b;
+  --pink-soft: #fbe3f0;
   --violet: #6d3df0;
-  --violet-soft: #ece6ff;
+  --violet-soft: #e4dafc;
+  --seg-on: #ffffff;
+  --card-shadow: 0 1px 2px rgb(23 18 43 / 0.04), 0 12px 32px -20px rgb(23 18 43 / 0.22);
   --sky: #1284b8;
   --sky-soft: #def2fb;
   --danger: #c0322b;
@@ -70,12 +77,16 @@
   --ink: #f3f0fc;
   --ink-2: #d2cce8;
   --muted: #a098bf;
-  --brand: #e22a8f;
-  --brand-hover: #f0489f;
-  --brand-ink: #ff7fbd;
-  --brand-soft: #3a1431;
+  --brand: #7650f2;
+  --brand-hover: #8a69ff;
+  --brand-ink: #b9a6ff;
+  --brand-soft: #2b2058;
+  --pink: #ff7fbd;
+  --pink-soft: #3a1431;
   --violet: #a48bff;
-  --violet-soft: #271d4d;
+  --violet-soft: #2b2058;
+  --seg-on: #40376a;
+  --card-shadow: none;
   --sky: #5cc8f2;
   --sky-soft: #0f2e3d;
   --danger: #ff8a80;
@@ -103,17 +114,17 @@
   --default: var(--subtle);
   --default-foreground: var(--ink);
   --default-hover: var(--line);
-  --border: var(--line);
+  --border: transparent;
   --separator: var(--line);
-  --field-background: var(--surface);
+  --field-background: var(--subtle);
   --field-foreground: var(--ink);
   --field-placeholder: color-mix(in srgb, var(--muted) 75%, transparent);
-  --field-border: var(--line-strong);
-  --field-border-width: 1px;
-  --field-border-hover: var(--muted);
+  --field-border: transparent;
+  --field-border-width: 2px;
+  --field-border-hover: transparent;
   --field-border-focus: var(--brand);
-  --field-hover: var(--surface);
-  --field-focus: var(--surface);
+  --field-hover: var(--subtle);
+  --field-focus: var(--subtle);
   --field-radius: 0.75rem;
   --field-shadow: 0 0 #0000;
   --focus: var(--brand);
@@ -171,23 +182,24 @@
     @apply h-12 px-6 text-[16px] md:h-12;
   }
 
-  /* A box with a hairline border: the one container style used everywhere. */
+  /* A box: a lighter fill and a soft shadow, no outline. The one container style used everywhere. */
   .card {
-    @apply rounded-2xl border border-line bg-surface;
+    @apply rounded-2xl bg-surface;
+    box-shadow: var(--card-shadow);
   }
 
-  /* The pink button, for links that look like buttons. */
+  /* The violet button, for links that look like buttons. */
   .btn {
     @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--brand-hover)];
   }
 
   .btn-quiet {
-    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-subtle;
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-subtle px-5 text-[15px] font-medium text-ink transition-colors hover:bg-line;
   }
 
   /* One choice out of a few, shown side by side. */
   .seg {
-    @apply inline-flex flex-wrap rounded-xl border border-line-strong bg-surface p-0.5;
+    @apply inline-flex flex-wrap rounded-xl bg-subtle p-1;
   }
 
   .seg > button {
@@ -195,15 +207,22 @@
   }
 
   .seg > button:hover {
-    @apply bg-subtle;
+    @apply text-ink;
   }
 
   .seg > button[aria-pressed="true"] {
-    @apply bg-ink text-canvas;
+    @apply font-medium text-ink;
+    background: var(--seg-on);
+    box-shadow: 0 1px 2px rgb(23 18 43 / 0.12);
   }
 
   .field-native {
-    @apply w-full rounded-xl border border-line-strong bg-surface px-3.5 text-[15px] text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand;
+    @apply w-full rounded-xl bg-subtle px-3.5 text-[15px] text-ink outline-none transition-shadow placeholder:text-muted/70;
+    border: 0;
+  }
+
+  .field-native:focus {
+    box-shadow: 0 0 0 2px var(--brand);
   }
 
   input.field-native,

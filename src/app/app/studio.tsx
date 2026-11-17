@@ -109,7 +109,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           </Button>
         </form>
 
-        <div className="mt-5 grid gap-x-8 gap-y-4 border-t border-line pt-5 md:grid-cols-2">
+        <div className="mt-6 grid gap-x-8 gap-y-4 md:grid-cols-2">
           <Choice label="How many clips">
             <div className="seg">
               {[1, 2, 3, 5, 8, 10]
@@ -426,7 +426,7 @@ function Player({ clip, onClose, onDelete, onChanged }: { clip: Clip; onClose: (
                   <Download className="size-[18px]" aria-hidden /> Download
                 </a>
                 <Button
-                  variant="outline"
+                  variant="tertiary"
                   onPress={async () => {
                     await navigator.clipboard.writeText(post).catch(() => {});
                     setCopied(true);
@@ -454,11 +454,11 @@ function Nudge({ label, value, set }: { label: string; value: number; set: (n: n
   return (
     <div className="flex items-center gap-2">
       <span className="w-[86px] text-[13.5px] text-ink-2">{label}</span>
-      <button type="button" aria-label={`${label} one second earlier`} disabled={value <= -8} onClick={() => set(value - 1)} className="grid size-8 place-items-center rounded-lg border border-line-strong hover:bg-subtle disabled:opacity-40">
+      <button type="button" aria-label={`${label} one second earlier`} disabled={value <= -8} onClick={() => set(value - 1)} className="grid size-8 place-items-center rounded-lg bg-subtle hover:bg-line disabled:opacity-40">
         <Minus className="size-4" aria-hidden />
       </button>
       <span className="w-[92px] text-center text-[13.5px] tabular-nums">{value === 0 ? "as it is" : `${Math.abs(value)} sec ${value < 0 ? "earlier" : "later"}`}</span>
-      <button type="button" aria-label={`${label} one second later`} disabled={value >= 8} onClick={() => set(value + 1)} className="grid size-8 place-items-center rounded-lg border border-line-strong hover:bg-subtle disabled:opacity-40">
+      <button type="button" aria-label={`${label} one second later`} disabled={value >= 8} onClick={() => set(value + 1)} className="grid size-8 place-items-center rounded-lg bg-subtle hover:bg-line disabled:opacity-40">
         <Plus className="size-4" aria-hidden />
       </button>
     </div>

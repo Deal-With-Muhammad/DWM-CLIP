@@ -53,9 +53,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           {[
             ["bg-tile-pink", "HE DIDN'T SEE IT"],
             ["bg-tile-sky", "1 VS 3"],
-            ["bg-tile-pink", "WAIT FOR IT"],
+            ["bg-[#3a1fa8]", "WAIT FOR IT"],
           ].map(([tile, hook], i) => (
-            <div key={i} className={`relative aspect-[9/16] w-[104px] overflow-hidden rounded-xl border-2 border-white/25 ${tile}`}>
+            <div key={i} className={`relative aspect-[9/16] w-[104px] overflow-hidden rounded-xl ${tile}`}>
               <span className="absolute inset-x-0 top-[22%] mx-auto w-fit rounded bg-white px-1.5 py-0.5 text-[8px] font-extrabold text-[#17122b]">{hook}</span>
               <span className="absolute inset-x-0 bottom-[24%] text-center text-[11px] font-extrabold text-white" style={{ textShadow: "0 1px 0 #17122b" }}>
                 NO <span style={{ color: "#fff000" }}>WAY</span>

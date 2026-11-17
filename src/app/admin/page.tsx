@@ -98,7 +98,7 @@ export default async function AdminPage() {
         <h2 className="mt-10 font-display text-[20px]">Members</h2>
         <div className="card mt-3 overflow-x-auto">
           <table className="w-full min-w-[760px] text-start text-[13.5px]">
-            <thead className="border-b border-line text-muted">
+            <thead className="text-muted">
               <tr>
                 {["Email", "Joined", "Plan", "Videos", "Clips", "Storage", "Change"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-start font-medium">
@@ -111,7 +111,7 @@ export default async function AdminPage() {
               {users.map((u) => {
                 const plan = u.pro ? "Pro (paid)" : u.lite ? "Lite (paid)" : u.plan_override === "pro" ? "Pro (given)" : "Free";
                 return (
-                  <tr key={u.id} className="border-b border-line last:border-0">
+                  <tr key={u.id} className="odd:bg-canvas">
                     <td className="max-w-[220px] truncate px-4 py-2.5">{u.email}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap text-muted">{date(u.created_at)}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{plan}</td>
@@ -127,13 +127,13 @@ export default async function AdminPage() {
                           <form action={setPlan}>
                             <input type="hidden" name="id" value={u.id} />
                             <input type="hidden" name="plan" value={u.plan_override === "pro" ? "" : "pro"} />
-                            <button className="rounded-lg border border-line-strong px-2.5 py-1 whitespace-nowrap hover:bg-subtle">{u.plan_override === "pro" ? "Take Pro away" : "Give Pro"}</button>
+                            <button className="rounded-lg bg-subtle px-2.5 py-1 whitespace-nowrap hover:bg-line">{u.plan_override === "pro" ? "Take Pro away" : "Give Pro"}</button>
                           </form>
                         )}
                         <form action={setBonus}>
                           <input type="hidden" name="id" value={u.id} />
                           <input type="hidden" name="gb" value={u.bonus_bytes > 0 ? "0" : "10"} />
-                          <button className="rounded-lg border border-line-strong px-2.5 py-1 whitespace-nowrap hover:bg-subtle">{u.bonus_bytes > 0 ? "Remove extra GB" : "+10 GB"}</button>
+                          <button className="rounded-lg bg-subtle px-2.5 py-1 whitespace-nowrap hover:bg-line">{u.bonus_bytes > 0 ? "Remove extra GB" : "+10 GB"}</button>
                         </form>
                       </div>
                     </td>
@@ -145,10 +145,10 @@ export default async function AdminPage() {
         </div>
 
         <h2 className="mt-10 font-display text-[20px]">Latest videos</h2>
-        <div className="card mt-3 divide-y divide-line">
+        <div className="card mt-3 overflow-hidden">
           {jobs.length === 0 && <p className="px-4 py-6 text-[14px] text-muted">No videos yet.</p>}
           {jobs.map((j) => (
-            <div key={j.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13.5px]">
+            <div key={j.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13.5px] even:bg-canvas">
               <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-medium ${j.status === "error" ? "bg-danger-soft text-danger" : j.status === "done" ? "bg-sky-soft text-sky" : "bg-warn-soft text-warn-ink"}`}>{j.status}</span>
               <span className="min-w-0 flex-1 truncate">{j.title || j.url}</span>
               <span className="text-muted">
@@ -160,10 +160,10 @@ export default async function AdminPage() {
         </div>
 
         <h2 className="mt-10 font-display text-[20px]">Payments</h2>
-        <div className="card mt-3 divide-y divide-line">
+        <div className="card mt-3 overflow-hidden">
           {events.length === 0 && <p className="px-4 py-6 text-[14px] text-muted">No payment events yet.</p>}
           {events.map((e, i) => (
-            <div key={i} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5 text-[13.5px]">
+            <div key={i} className="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5 text-[13.5px] even:bg-canvas">
               <span className="font-medium">{e.event}</span>
               <span className="min-w-0 flex-1 truncate text-ink-2">{e.detail}</span>
               <span className="text-muted">

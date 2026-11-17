@@ -46,7 +46,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {label}
         </a>
       );
-    return <PayButton kind={kind} priceId={paddle.prices[kind]} checkout={checkout} label={label} variant={quiet ? "outline" : "primary"} />;
+    return <PayButton kind={kind} priceId={paddle.prices[kind]} checkout={checkout} label={label} variant={quiet ? "tertiary" : "primary"} />;
   };
 
   return (
@@ -78,10 +78,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               const mine = p.id === account.plan;
               const up = (p.id === "lite" && account.plan === "free") || (p.id === "pro" && account.plan !== "pro");
               return (
-                <div key={p.id} className={`flex flex-col rounded-xl p-4 ${mine ? "border-2 border-brand" : "border border-line"}`}>
+                <div key={p.id} className={`flex flex-col rounded-xl p-4 ${mine ? "bg-brand-soft" : "bg-canvas"}`}>
                   <p className="flex items-center gap-2 text-[15px] font-semibold">
                     {p.name}
-                    {mine && <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-brand-ink">Your plan</span>}
+                    {mine && <span className="rounded-md bg-brand px-1.5 py-0.5 text-[11.5px] font-semibold text-white">Your plan</span>}
                   </p>
                   <p className="mt-1 font-display text-[26px] leading-none">
                     ${p.price}
