@@ -1,19 +1,13 @@
 import { Captions, Check, Hash, MessageSquareText, Scissors, Sparkles, SquarePen, Video, Wand2 } from "lucide-react";
 import Link from "next/link";
 
+import { HeroVideo } from "@/components/hero-video";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
 import { FREE, LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
-
-// What a finished clip looks like: the hook box on top, word-by-word captions, a score.
-const SAMPLES = [
-  { hook: "HE DIDN'T SEE IT", words: ["NO", "WAY", "BRO"], on: 1, score: 92, title: "The cop car came out of nowhere", tile: "bg-tile-pink", cam: true },
-  { hook: "1 VS 3", words: ["WATCH", "THIS"], on: 0, score: 87, title: "Clutch escape with one bar of health", tile: "bg-tile-violet", cam: true },
-  { hook: "WAIT FOR IT", words: ["OH", "MY", "GOD"], on: 2, score: 81, title: "The jump nobody thought would land", tile: "bg-tile-sky", cam: false },
-];
 
 const FEATURES = [
   { icon: Sparkles, tint: "bg-brand-soft text-brand-ink", title: "Finds the moments for you", text: "It reads what was said and listens for the loud parts, then picks the moments a stranger would stop scrolling for. Each one gets a score." },
@@ -94,52 +88,38 @@ export default async function Home() {
       </header>
 
       <main>
-        <section className="mx-auto grid w-full max-w-[1080px] items-center gap-12 px-4 pt-12 pb-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:pt-20 lg:pb-24">
-          <div className="rise">
-            <h1 className="font-display text-[42px] leading-[1.04] sm:text-[56px]">Paste a link. Get clips that are ready to post.</h1>
-            <p className="mt-5 max-w-[510px] text-[17.5px] leading-relaxed text-ink-2">
-              DWM Clip watches a stream or long video for you, finds the best moments, and turns each one into a vertical clip with captions, a hook, a title and hashtags.
-            </p>
-            <div className="mt-8 max-w-[530px]">
-              <TryBox />
-              <p className="mt-3 text-[13.5px] text-muted">
-                Free to try: {FREE.clips} clips, no card. Plans from ${LITE.price} a month.
+        {/* The first screen: a dark panel with the film of a long video being cut into clips. On a wide screen the
+            film fills the panel and the words sit over its empty left side; on anything narrower the film sits
+            under the words (cropped to its busy right side on a phone). */}
+        <section className="mx-auto w-full max-w-[1240px] px-3 pt-3 sm:px-5">
+          <div className="relative overflow-hidden rounded-[28px] bg-[#0a0f23] text-white">
+            <div className="rise relative z-10 max-w-[640px] px-6 pt-10 pb-6 sm:px-10 sm:pt-14 xl:w-[43%] xl:max-w-none xl:py-24">
+              <h1 className="font-display text-[38px] leading-[1.05] sm:text-[46px] xl:text-[52px]">Paste a link. Get clips that are ready to post.</h1>
+              <p className="mt-5 text-[16.5px] leading-relaxed text-white/80">
+                DWM Clip watches a stream or long video for you, finds the best moments, and cuts each one into a vertical clip with captions, a hook, a title and hashtags.
+              </p>
+              <div className="mt-7">
+                <TryBox />
+                <p className="mt-3 text-[13.5px] text-white/65">
+                  Free to try: {FREE.clips} clips, no card. Plans from ${LITE.price} a month.
+                </p>
+              </div>
+              <p className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-white/65">
+                From
+                {["YouTube", "Twitch", "Kick"].map((x) => (
+                  <span key={x} className="rounded-md bg-white/10 px-2 py-0.5 font-medium text-white/90">
+                    {x}
+                  </span>
+                ))}
+                to
+                {["TikTok", "Reels", "Shorts"].map((x) => (
+                  <span key={x} className="rounded-md bg-tile-pink px-2 py-0.5 font-medium text-white">
+                    {x}
+                  </span>
+                ))}
               </p>
             </div>
-            <p className="mt-9 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13.5px] text-muted">
-              From
-              {["YouTube", "Twitch", "Kick"].map((s) => (
-                <span key={s} className="rounded-md bg-subtle px-2 py-0.5 font-medium text-ink-2">
-                  {s}
-                </span>
-              ))}
-              to
-              {["TikTok", "Reels", "Shorts"].map((s) => (
-                <span key={s} className="rounded-md bg-brand-soft px-2 py-0.5 font-medium text-brand-ink">
-                  {s}
-                </span>
-              ))}
-            </p>
-          </div>
-
-          <div className="flex justify-center gap-3 sm:gap-4" aria-hidden>
-            {SAMPLES.map((s, i) => (
-              <div key={s.hook} className={`rise w-[31%] max-w-[176px] ${i === 1 ? "mt-10" : ""}`} style={{ animationDelay: `${80 + i * 70}ms` }}>
-                <div className={`relative aspect-[9/16] overflow-hidden rounded-2xl ${s.tile}`}>
-                  {s.cam && <span className="absolute end-2 top-2 h-[17%] w-[36%] rounded-md border-2 border-white/70 bg-white/20" />}
-                  <span className="absolute inset-x-0 top-[24%] mx-auto w-fit max-w-[88%] rounded-md bg-white px-2 py-1 text-center text-[10px] leading-tight font-extrabold text-[#17122b] sm:text-[11.5px]">{s.hook}</span>
-                  <span className="absolute inset-x-0 bottom-[26%] flex justify-center gap-1.5 text-[13px] font-extrabold text-white sm:text-[16px]" style={{ textShadow: "0 0 3px #17122b, 0 2px 0 #17122b" }}>
-                    {s.words.map((w, k) => (
-                      <span key={w} style={k === s.on ? { color: "#fff000" } : undefined}>
-                        {w}
-                      </span>
-                    ))}
-                  </span>
-                  <span className="absolute start-2 bottom-2 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-[#17122b] tabular-nums">{s.score}</span>
-                </div>
-                <p className="mt-2.5 line-clamp-2 text-[12.5px] leading-snug font-medium text-ink-2">{s.title}</p>
-              </div>
-            ))}
+            <HeroVideo className="block aspect-[4/3] w-full object-cover object-[82%_50%] sm:aspect-[16/9] sm:object-center xl:absolute xl:inset-0 xl:aspect-auto xl:h-full xl:object-[100%_50%]" />
           </div>
         </section>
 
