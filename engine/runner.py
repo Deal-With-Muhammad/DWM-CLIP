@@ -186,6 +186,7 @@ def make(spec, web, work):
                     job["facecam"] = looked["box"] = max(agreed or found, key=lambda a: a[2] * a[3])
             except Exception:  # noqa: BLE001 - a missing facecam is not a failure
                 traceback.print_exc()
+            looked["done"] = True       # only now may the website be told whether there is a webcam
             return looked["box"]
 
         jobs._facecam = find_facecam
@@ -218,7 +219,18 @@ def make(spec, web, work):
     def run():
         ctx.set_uid(uid)
         try:
-            jobs._run_job(job)
+            # A video site sometimes refuses one download ("403 Forbidden") and accepts the next. Before any
+            # clip exists, the video is simply started again, twice at most.
+            for attempt in range(3):
+                try:
+                    jobs._run_job(job)
+                    break
+                except Exception as e:  # noqa: BLE001
+                    if attempt == 2 or job["clips"] or not re.search(r"\b403\b|Forbidden", str(e)):
+                        raise
+                    traceback.print_exc()
+                    job.update(status="running", stage="The video site refused the download, trying again", error=None)
+                    time.sleep(6 + 6 * attempt)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             for c in job["clips"]:
@@ -275,7 +287,7 @@ def make(spec, web, work):
             "failed": [{"id": c["id"], "error": c.get("error") or ""} for c in job["clips"] if c.get("status") == "error"],
             "found": len(job["clips"]), "storage_full": full,
             # Whether the streamer's webcam was found: None until it has been looked for.
-            "facecam": (bool(looked.get("box")) if "box" in looked else None) if asked_cam else None,
+            "facecam": (bool(looked.get("box")) if looked.get("done") else None) if asked_cam else None,
         }
         if final or body != last:
             if tell(body) == 410:                     # the job was deleted on the website: stop working on it
