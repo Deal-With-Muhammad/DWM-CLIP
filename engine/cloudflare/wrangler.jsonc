@@ -13,7 +13,6 @@
     {
       "class_name": "ClipEngine",
       "scheduling_policy": "durable_object",
-      "max_instances": 5,
       "images": { "base": { "dockerfile": "../Dockerfile" } }
     }
   ],
