@@ -19,12 +19,18 @@ export const metadata: Metadata = {
   icons: { icon: "/icon.svg" },
 };
 
-export const viewport: Viewport = { themeColor: "#f6f7f6", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: [{ color: "#efeaf8" }, { media: "(prefers-color-scheme: dark)", color: "#efeaf8" }] };
+
+// The page is light unless the visitor chose dark before. Set before anything is drawn, so there's no flash.
+const THEME = `try{var t=localStorage.getItem("dwm-clip-theme");if(t==="dark")document.documentElement.dataset.theme="dark"}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${funnelSans.variable} ${funnelDisplay.variable} min-h-dvh overflow-x-clip`}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME }} />
+      </head>
+      <body className={`${funnelSans.variable} ${funnelDisplay.variable} min-h-dvh overflow-x-clip`} suppressHydrationWarning>{children}</body>
     </html>
   );
 }

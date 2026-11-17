@@ -4,28 +4,32 @@
 export const MB = 1024 * 1024;
 export const GB = 1024 * MB;
 
-export const FREE = {
-  name: "Free",
-  storage: 200 * MB,
-  /** Clips in total, ever. After that it's Pro. */
-  clips: 2,
-  clipsPerVideo: 2,
-  maxHours: 1,
-  jobsAtOnce: 1,
+export type PlanId = "free" | "lite" | "pro";
+
+export type Plan = {
+  id: PlanId;
+  name: string;
+  /** US dollars a month. */
+  price: number;
+  storage: number;
+  /** Clips per calendar month (in total, ever, on Free). */
+  clips: number;
+  clipsPerVideo: number;
+  maxHours: number;
+  jobsAtOnce: number;
+  /** The tallest picture fetched from the video. Clips are always 1080x1920. */
+  quality: number;
+  /** Uses our AI, so the member needs no key of their own. */
+  ourAi: boolean;
 };
 
-export const PRO = {
-  name: "Pro",
-  price: 9,
-  storage: 5 * GB,
-  /** Clips per calendar month. */
-  clips: 100,
-  clipsPerVideo: 10,
-  maxHours: 3,
-  jobsAtOnce: 2,
-};
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 2, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720, ourAi: false };
+export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 20, clipsPerVideo: 5, maxHours: 2, jobsAtOnce: 1, quality: 1080, ourAi: true };
+export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 150, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, ourAi: true };
 
-/** Extra storage, sold in blocks on top of Pro. */
+export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
+
+/** Extra storage, sold in blocks on top of a paid plan. */
 export const STORAGE_PACK = { bytes: 10 * GB, price: 2 };
 
 export const SITES = ["youtube.com", "youtu.be", "twitch.tv", "kick.com"];
@@ -36,11 +40,17 @@ export const STYLES = [
   { id: "clean", label: "Clean" },
 ] as const;
 
+// How the wide video is fitted into the tall clip. "auto" keeps the streamer's webcam in the corner
+// when the video has one, and simply fills the screen when it doesn't.
 export const LAYOUTS = [
-  { id: "gameplay", label: "Gameplay + facecam" },
-  { id: "crop", label: "Fill the screen" },
-  { id: "blur", label: "Full frame, blurred edges" },
+  { id: "auto", label: "Auto", hint: "Fills the screen, and keeps the streamer's webcam in the corner if the video has one." },
+  { id: "crop", label: "Fill screen", hint: "The middle of the video fills the whole clip." },
+  { id: "blur", label: "Whole frame", hint: "The whole wide picture, with soft blurred edges above and below." },
 ] as const;
+
+/** The engine's own names for the layouts above. */
+export const ENGINE_LAYOUT: Record<string, string> = { auto: "gameplay", crop: "crop", blur: "blur" };
+export const fromEngineLayout = (l: string) => (l === "gameplay" ? "auto" : l === "blur" || l === "zoom" ? "blur" : "crop");
 
 // The AI services a member can bring a key for. `model` is a sensible default they can change.
 export const PROVIDERS = [

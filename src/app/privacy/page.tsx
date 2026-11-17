@@ -13,7 +13,7 @@ export default function Privacy() {
       <section>
         <h2>Who else sees it</h2>
         <p>
-          Cloudflare hosts the site, the database and your clips. The words spoken in a video you clip are sent to an AI service to choose the moments: Google Gemini on Pro, or the service whose key you added on the free plan. Sign-in emails are sent through
+          Cloudflare hosts the site, the database and your clips. The words spoken in a video you clip are sent to an AI service to choose the moments and write the titles: our AI provider on Lite and Pro, or the service whose key you added on the free plan. Sign-in emails are sent through
           Gmail. Nothing is sold or used for advertising.
         </p>
       </section>

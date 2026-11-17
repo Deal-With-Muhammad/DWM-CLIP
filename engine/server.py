@@ -55,8 +55,8 @@ class Handler(BaseHTTPRequestHandler):
         if not SECRET or not hmac.compare_digest(given, "Bearer " + SECRET):
             return self._send(401, {"error": "unauthorized"})
         try:
-            spec = json.loads(self.rfile.read(min(int(self.headers.get("content-length", "0")), 65536)))
-            for k in ("id", "url", "callback", "token"):
+            spec = json.loads(self.rfile.read(min(int(self.headers.get("content-length", "0")), 1_000_000)))
+            for k in ("id", "url", "callback", "token"):   # an edit also carries "job" and "clip"; the runner checks those
                 if not isinstance(spec.get(k), str) or not spec[k]:
                     raise ValueError(k)
         except (ValueError, TypeError):

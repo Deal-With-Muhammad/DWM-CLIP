@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import type { Look } from "@/lib/look";
 import { setting } from "@/lib/server/settings";
 
 // The clip engine (the engine/ folder) does the video work: it fetches the video,
@@ -31,13 +32,24 @@ export type EngineJob = {
   options: { max_clips: number; min_len: number; max_len: number; style: string; layout: string; captions: boolean; quality: number };
   ai: { provider: string; model: string; key: string } | null;
   max_hours: number;
+  /** What the member asked the AI to look for. */
+  focus: string;
+  /** The member's own caption look, or null for one of the ready-made styles. */
+  look: Look | null;
 };
 
-export async function startJob(job: EngineJob) {
+/** A changed clip to make again. `job` is the video it belongs to, which is what the engine reports back about. */
+export type EngineEdit = { id: string; mode: "edit"; job: string; url: string; callback: string; quality: number; clip: Record<string, unknown>; words: unknown; fixed_words: unknown; fixed_for: unknown };
+
+export const startEdit = (edit: EngineEdit) => send(edit, edit.job);
+
+export const startJob = (job: EngineJob) => send(job, job.id);
+
+async function send(job: EngineJob | EngineEdit, tokenFor: string) {
   const res = await fetch(`${setting("ENGINE_URL").replace(/\/$/, "")}/jobs`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${secret()}` },
-    body: JSON.stringify({ ...job, token: jobToken(job.id) }),
+    body: JSON.stringify({ ...job, token: jobToken(tokenFor) }),
     signal: AbortSignal.timeout(20_000),
   });
   if (res.status === 429) throw new Error("busy");

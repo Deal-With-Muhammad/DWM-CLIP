@@ -15,11 +15,11 @@ import { setting } from "@/lib/server/settings";
 //     is cancelled or ends, and the `subscriptions` table is kept up to date from that.
 //
 // Settings:
-//   LEMONSQUEEZY_LINK_PRO, LEMONSQUEEZY_LINK_STORAGE         each product's checkout link (Share → Checkout link)
-//   LEMONSQUEEZY_PRODUCT_PRO, LEMONSQUEEZY_PRODUCT_STORAGE   each product's numeric id
+//   LEMONSQUEEZY_LINK_LITE, _PRO, _STORAGE       each product's checkout link (Share → Checkout link)
+//   LEMONSQUEEZY_PRODUCT_LITE, _PRO, _STORAGE    each product's numeric id
 //   LEMONSQUEEZY_WEBHOOK_SECRET                              the signing secret typed into the webhook
 
-const linkFor = (kind: Kind) => setting(kind === "pro" ? "LEMONSQUEEZY_LINK_PRO" : "LEMONSQUEEZY_LINK_STORAGE");
+const linkFor = (kind: Kind) => setting(kind === "pro" ? "LEMONSQUEEZY_LINK_PRO" : kind === "lite" ? "LEMONSQUEEZY_LINK_LITE" : "LEMONSQUEEZY_LINK_STORAGE");
 
 export const lemonEnabled = (kind: Kind) => Boolean(linkFor(kind));
 
@@ -32,6 +32,7 @@ export function lemonCheckout(kind: Kind, userId: string) {
 function kindOfProduct(productId: string | null): Kind | null {
   if (!productId) return null;
   if (productId === setting("LEMONSQUEEZY_PRODUCT_PRO")) return "pro";
+  if (productId === setting("LEMONSQUEEZY_PRODUCT_LITE")) return "lite";
   if (productId === setting("LEMONSQUEEZY_PRODUCT_STORAGE")) return "storage";
   return null;
 }

@@ -12,8 +12,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const job = await first("select id from jobs where id = ? and user_id = ?", id, user.id);
   if (!job) return fail(404, "That video isn't here any more.");
-  const clips = await all<{ video_key: string; cover_key: string | null }>("select video_key, cover_key from clips where job_id = ?", id);
-  await removeFiles(clips.flatMap((c) => [c.video_key, c.cover_key]));
+  const clips = await all<{ video_key: string; cover_key: string | null; data_key: string | null }>("select video_key, cover_key, data_key from clips where job_id = ?", id);
+  await removeFiles(clips.flatMap((c) => [c.video_key, c.cover_key, c.data_key]));
   await run("delete from jobs where id = ?", id);
   return NextResponse.json({ ok: true });
 }

@@ -89,14 +89,14 @@ export function KeyForm({ saved: initial }: { saved: Saved }) {
         <input value={key} onChange={(e) => setKey(e.target.value)} type="password" autoComplete="off" spellCheck={false} placeholder={saved ? "Paste a new key to replace the saved one" : "Paste your key"} className="field-native font-mono text-[14px]" />
       </label>
       {message && (
-        <p role={message.ok ? undefined : "alert"} className={`rounded-xl px-3.5 py-2.5 text-[14px] ${message.ok ? "bg-brand-soft text-brand-ink" : "bg-danger-soft text-danger"}`}>
+        <p role={message.ok ? undefined : "alert"} className={`rounded-xl px-3.5 py-2.5 text-[14px] ${message.ok ? "bg-sky-soft text-sky" : "bg-danger-soft text-danger"}`}>
           {message.text}
         </p>
       )}
       <Button type="submit" isDisabled={busy || key.trim().length < 16}>
         {busy ? "Checking the key…" : "Save and test"}
       </Button>
-      <p className="text-[12.5px] leading-relaxed text-muted">Your key is stored encrypted, used only to clip your own videos, and you pay that service directly for what it uses (usually nothing on Gemini&apos;s free tier).</p>
+      <p className="text-[12.5px] leading-relaxed text-muted">Your key is stored encrypted, used only to clip your own videos, and you pay that service directly for what it uses (often nothing, on a free tier).</p>
     </form>
   );
 }

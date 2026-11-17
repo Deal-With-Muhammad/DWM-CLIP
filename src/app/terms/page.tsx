@@ -1,5 +1,5 @@
 import { Legal } from "@/components/legal";
-import { FREE, PRO, formatBytes } from "@/lib/plans";
+import { FREE, LITE, PRO, formatBytes } from "@/lib/plans";
 import { site } from "@/lib/site";
 
 export const metadata = { title: "Terms" };
@@ -21,7 +21,7 @@ export default function Terms() {
       <section>
         <h2>Plans and limits</h2>
         <p>
-          Free: {FREE.clips} clips with your own AI key and {formatBytes(FREE.storage)} of storage. Pro: {PRO.clips} clips a month and {formatBytes(PRO.storage)} of storage, billed monthly until cancelled. Limits may change; a change never shortens a month you
+          Free: {FREE.clips} clips with your own AI key and {formatBytes(FREE.storage)} of storage. Lite: {LITE.clips} clips a month and {formatBytes(LITE.storage)} of storage. Pro: {PRO.clips} clips a month and {formatBytes(PRO.storage)} of storage. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
           already paid for.
         </p>
       </section>

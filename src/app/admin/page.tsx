@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
+import { LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { all, first } from "@/lib/server/db";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
@@ -52,9 +52,10 @@ export default async function AdminPage() {
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from users where created_at > ? group by day", since),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from clips where created_at > ? group by day", since),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from jobs where created_at > ? group by day", since),
-    all<{ id: string; email: string; created_at: string; plan_override: string | null; bonus_bytes: number; pro: number; clips: number; bytes: number; jobs: number }>(
+    all<{ id: string; email: string; created_at: string; plan_override: string | null; bonus_bytes: number; pro: number; lite: number; clips: number; bytes: number; jobs: number }>(
       `select u.id, u.email, u.created_at, u.plan_override, u.bonus_bytes,
         (select count(*) from subscriptions s where s.user_id = u.id and s.kind = 'pro' and (s.status in ('active', 'trialing', 'on_trial', 'past_due') or (s.status = 'cancelled' and s.ends_at > ?1))) as pro,
+        (select count(*) from subscriptions s where s.user_id = u.id and s.kind = 'lite' and (s.status in ('active', 'trialing', 'on_trial', 'past_due') or (s.status = 'cancelled' and s.ends_at > ?1))) as lite,
         (select coalesce(sum(clips), 0) from usage g where g.user_id = u.id) as clips,
         (select coalesce(sum(bytes), 0) from clips c where c.user_id = u.id) as bytes,
         (select count(*) from jobs j where j.user_id = u.id) as jobs
@@ -69,18 +70,19 @@ export default async function AdminPage() {
   const t = totals!;
   const proCount = subs.find((s) => s.kind === "pro")?.n ?? 0;
   const packs = subs.find((s) => s.kind === "storage")?.n ?? 0;
-  const mrr = proCount * PRO.price + packs * STORAGE_PACK.price;
+  const liteCount = subs.find((s) => s.kind === "lite")?.n ?? 0;
+  const mrr = proCount * PRO.price + liteCount * LITE.price + packs * STORAGE_PACK.price;
   const date = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
   return (
     <>
-      <AppHeader email={user.email} plan={account.plan} admin />
+      <AppHeader email={user.email} plan={account.plan} planName={account.planName} admin />
       <main className="mx-auto w-full max-w-[1040px] px-4 pb-20 sm:px-6">
         <h1 className="mt-8 font-display text-[28px]">Admin</h1>
 
         <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile label="Members" value={t.users} sub={`${t.users7} new this week`} />
-          <Tile label="Paying (Pro)" value={proCount} sub={`$${mrr}/month, ${packs} storage packs`} />
+          <Tile label="Paying members" value={proCount + liteCount} sub={`$${mrr}/month: ${proCount} Pro, ${liteCount} Lite, ${packs} storage`} />
           <Tile label="Active this week" value={t.active7} sub="members who clipped a video" />
           <Tile label="Clips made" value={t.clips} sub={`${t.jobs} video${t.jobs === 1 ? "" : "s"}, ${t.failed} failed`} />
           <Tile label="Storage in use" value={formatBytes(t.bytes)} sub={`about $${((t.bytes / 1024 ** 3) * 0.015).toFixed(2)}/month on R2`} />
@@ -107,7 +109,7 @@ export default async function AdminPage() {
             </thead>
             <tbody>
               {users.map((u) => {
-                const plan = u.pro ? "Pro (paid)" : u.plan_override === "pro" ? "Pro (given)" : "Free";
+                const plan = u.pro ? "Pro (paid)" : u.lite ? "Lite (paid)" : u.plan_override === "pro" ? "Pro (given)" : "Free";
                 return (
                   <tr key={u.id} className="border-b border-line last:border-0">
                     <td className="max-w-[220px] truncate px-4 py-2.5">{u.email}</td>
@@ -121,7 +123,7 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1.5">
-                        {!u.pro && (
+                        {!u.pro && !u.lite && (
                           <form action={setPlan}>
                             <input type="hidden" name="id" value={u.id} />
                             <input type="hidden" name="plan" value={u.plan_override === "pro" ? "" : "pro"} />
@@ -147,7 +149,7 @@ export default async function AdminPage() {
           {jobs.length === 0 && <p className="px-4 py-6 text-[14px] text-muted">No videos yet.</p>}
           {jobs.map((j) => (
             <div key={j.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13.5px]">
-              <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-medium ${j.status === "error" ? "bg-danger-soft text-danger" : j.status === "done" ? "bg-brand-soft text-brand-ink" : "bg-warn-soft text-warn-ink"}`}>{j.status}</span>
+              <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-medium ${j.status === "error" ? "bg-danger-soft text-danger" : j.status === "done" ? "bg-sky-soft text-sky" : "bg-warn-soft text-warn-ink"}`}>{j.status}</span>
               <span className="min-w-0 flex-1 truncate">{j.title || j.url}</span>
               <span className="text-muted">
                 {j.email} · {j.found} clips · {j.ai_mode === "ours" ? "our AI" : "own key"} · {date(j.created_at)}

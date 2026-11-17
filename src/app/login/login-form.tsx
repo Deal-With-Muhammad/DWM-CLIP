@@ -9,8 +9,10 @@ type Step = { kind: "email" } | { kind: "code"; email: string };
 
 const CODE_LENGTH = 6;
 
-/** Sign in or sign up with a code sent by email. No passwords. */
-export function LoginForm({ next, reauth, linkFailed }: { next: string; reauth: boolean; linkFailed: boolean }) {
+/** Sign in or sign up with a code sent by email. No passwords. Either page works for a new or an existing address. */
+export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" | "signup"; next: string; reauth: boolean; linkFailed: boolean }) {
+  const signup = mode === "signup";
+  const other = `${signup ? "/login" : "/signup"}${next && next !== "/app" ? `?next=${encodeURIComponent(next)}` : ""}`;
   const [step, setStep] = useState<Step>({ kind: "email" });
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -66,11 +68,13 @@ export function LoginForm({ next, reauth, linkFailed }: { next: string; reauth: 
   if (step.kind === "email") {
     return (
       <>
-        <h1 className="font-display text-[34px] leading-[1.1] tracking-[-0.01em]">{reauth ? "Confirm it's you" : "Sign in to DWM Clip"}</h1>
+        <h1 className="font-display text-[34px] leading-[1.1] tracking-[-0.01em]">{reauth ? "Confirm it's you" : signup ? "Create your account" : "Welcome back"}</h1>
         <p className="mt-3 text-[16px] leading-relaxed text-muted">
           {reauth
             ? "The admin area asks for a fresh code every 12 hours."
-            : "We'll email you a 6-digit code, so there's no password to remember. New here? This creates your free account."}
+            : signup
+              ? "Enter your email and we'll send a 6-digit code to confirm it. You get 2 free clips, no card needed."
+              : "Enter your email and we'll send you a 6-digit code. There's no password to remember."}
         </p>
         <form
           className="mt-7 space-y-4"
@@ -85,9 +89,18 @@ export function LoginForm({ next, reauth, linkFailed }: { next: string; reauth: 
           </TextField>
           {errorNote}
           <Button type="submit" size="lg" fullWidth isDisabled={busy}>
-            {busy ? "Sending your code…" : "Continue with email"}
+            {busy ? "Sending your code…" : signup ? "Create account" : "Sign in"}
           </Button>
         </form>
+        {!reauth && (
+          <p className="mt-5 text-[14.5px] text-ink-2">
+            {signup ? "Already have an account?" : "New to DWM Clip?"}{" "}
+            <Link href={other} className="font-medium text-brand-ink underline underline-offset-4">
+              {signup ? "Sign in" : "Create an account"}
+            </Link>
+            {!signup && <span className="mt-1 block text-[13px] text-muted">Signing in with a new email creates your account too.</span>}
+          </p>
+        )}
         <p className="mt-5 text-[13px] leading-relaxed text-muted">
           By continuing, you agree to the{" "}
           <Link href="/terms" className="text-ink underline underline-offset-4">

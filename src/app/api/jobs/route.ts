@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { LAYOUTS, SITES, STYLES } from "@/lib/plans";
+import { cleanLook } from "@/lib/look";
+import { ENGINE_LAYOUT, LAYOUTS, SITES, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
 import { engineReady, startJob } from "@/lib/server/engine";
@@ -39,7 +40,7 @@ const between = (v: unknown, lo: number, hi: number, fallback: number) => (typeo
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
-  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; ownKey?: unknown };
+  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -51,18 +52,18 @@ export async function POST(req: Request) {
 
   const account = await accountOf(user);
   if (account.clipsLeft <= 0) {
-    return fail(402, account.plan === "pro" ? "You've used this month's clips. They reset on the 1st." : "You've used your free clips. Upgrade to Pro to keep clipping.", { upgrade: account.plan !== "pro" });
+    return fail(402, account.plan === "free" ? "You've used your free clips. Pick a plan to keep clipping." : "You've used this month's clips. They reset on the 1st.", { upgrade: account.plan !== "pro" });
   }
   if (account.used >= account.storage) return fail(402, "Your storage is full. Delete some clips or add storage.", { upgrade: true });
   const running = await first<{ n: number }>("select count(*) as n from jobs where user_id = ? and status in ('queued', 'running')", user.id);
-  if ((running?.n ?? 0) >= account.jobsAtOnce) return fail(409, account.jobsAtOnce === 1 ? "One video at a time on the free plan. Wait for this one to finish." : "Two videos are already being clipped. Wait for one to finish.");
+  if ((running?.n ?? 0) >= account.jobsAtOnce) return fail(409, account.jobsAtOnce === 1 ? "One video at a time on this plan. Wait for this one to finish." : "Two videos are already being clipped. Wait for one to finish.");
 
-  // Whose AI picks the moments: ours for Pro (unless they'd rather use their own key), the member's own on the free plan.
+  // Whose AI picks the moments: ours on a paid plan (unless they'd rather use their own key), the member's own on the free plan.
   const own = await keyFor(user.id);
-  const useOwn = account.plan !== "pro" || (body.ownKey === true && Boolean(own));
+  const useOwn = !account.ourAi || (body.ownKey === true && Boolean(own));
   let ai: { provider: string; model: string; key: string } | null;
   if (useOwn) {
-    if (!own) return fail(400, "Add your AI key first (it's free from Google AI Studio).", { needsKey: true });
+    if (!own) return fail(400, "Add your AI key first, or pick a plan and skip it.", { needsKey: true });
     ai = own;
   } else {
     const key = setting("AI_KEY");
@@ -75,26 +76,30 @@ export async function POST(req: Request) {
     max_clips: Math.min(between(body.clips, 1, 20, 3), account.clipsPerVideo, account.clipsLeft),
     min_len: 15,
     max_len: between(body.maxLen, 20, 90, 60),
+    // "custom" is the member's own look, sent to the engine beside the options.
     style: STYLES.some((s) => s.id === body.style) ? (body.style as string) : "bounce",
-    layout: LAYOUTS.some((l) => l.id === body.layout) ? (body.layout as string) : "gameplay",
+    layout: ENGINE_LAYOUT[LAYOUTS.some((l) => l.id === body.layout) ? (body.layout as string) : "auto"],
     captions: body.captions !== false,
-    quality: account.plan === "pro" ? 1080 : 720,
+    quality: account.quality,
   };
+  // What the member asked the AI to look for: one short line of plain text.
+  const focus = typeof body.focus === "string" ? body.focus.replace(/[\x00-\x1f\x7f{}]+/g, " ").trim().slice(0, 300) : "";
   const id = randomUUID();
   const at = nowIso();
   await run(
-    "insert into jobs (id, user_id, url, status, stage, options, ai_mode, model, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?)",
+    "insert into jobs (id, user_id, url, status, stage, options, focus, ai_mode, model, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?, ?)",
     id,
     user.id,
     url,
     JSON.stringify(options),
+    focus,
     useOwn ? "own" : "ours",
     ai.model,
     at,
     at,
   );
   try {
-    await startJob({ id, url, callback: `${siteOrigin(req)}/api/engine`, options, ai, max_hours: account.maxHours });
+    await startJob({ id, url, callback: `${siteOrigin(req)}/api/engine`, options, ai, max_hours: account.maxHours, focus, look: body.style === "custom" ? cleanLook(body.look) : null });
   } catch (e) {
     const busy = e instanceof Error && e.message === "busy";
     console.error("engine start", e);

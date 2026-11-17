@@ -34,7 +34,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     "content-type": cover ? "image/jpeg" : "video/mp4",
     "content-length": String(end - start + 1),
     "accept-ranges": "bytes",
-    "cache-control": "private, max-age=3600",
+    // Each version of a clip has its own address (?v=), so a file can be kept until it changes.
+    "cache-control": url.searchParams.has("v") ? "private, max-age=86400" : "private, no-cache",
   });
   if (partial) headers.set("content-range", `bytes ${start}-${end}/${size}`);
   if (url.searchParams.get("download")) {

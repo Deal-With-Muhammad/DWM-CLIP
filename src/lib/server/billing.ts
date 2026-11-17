@@ -22,7 +22,7 @@ import { setting } from "@/lib/server/settings";
 //   PADDLE_WEBHOOK_SECRET   the secret key of the notification destination (pdl_ntfset_…)
 //   PADDLE_PORTAL_URL       the customer portal link, where members manage or cancel
 
-export type Kind = "pro" | "storage";
+export type Kind = "lite" | "pro" | "storage";
 
 /**
  * Which service takes payments right now: PAYMENTS = "lemonsqueezy" or "paddle".
@@ -30,7 +30,7 @@ export type Kind = "pro" | "storage";
  */
 export const provider = (): "lemonsqueezy" | "paddle" => (setting("PAYMENTS") === "lemonsqueezy" ? "lemonsqueezy" : "paddle");
 
-const priceFor = (kind: Kind) => setting(kind === "pro" ? "PADDLE_PRICE_PRO" : "PADDLE_PRICE_STORAGE");
+const priceFor = (kind: Kind) => setting(kind === "pro" ? "PADDLE_PRICE_PRO" : kind === "lite" ? "PADDLE_PRICE_LITE" : "PADDLE_PRICE_STORAGE");
 
 export const paymentsEnabled = (kind: Kind = "pro") => Boolean(setting("PADDLE_CLIENT_TOKEN") && priceFor(kind));
 
@@ -40,7 +40,7 @@ export const sandbox = () => setting("PADDLE_ENV") === "sandbox";
 export const checkoutConfig = () => ({
   sandbox: sandbox(),
   token: setting("PADDLE_CLIENT_TOKEN"),
-  prices: { pro: priceFor("pro"), storage: priceFor("storage") },
+  prices: { lite: priceFor("lite"), pro: priceFor("pro"), storage: priceFor("storage") },
 });
 
 export const portalUrl = () => setting("PADDLE_PORTAL_URL") || null;
@@ -48,6 +48,7 @@ export const portalUrl = () => setting("PADDLE_PORTAL_URL") || null;
 export function kindOfPrice(priceId: string | null | undefined): Kind | null {
   if (!priceId) return null;
   if (priceId === priceFor("pro")) return "pro";
+  if (priceFor("lite") && priceId === priceFor("lite")) return "lite";
   if (priceId === priceFor("storage")) return "storage";
   return null;
 }

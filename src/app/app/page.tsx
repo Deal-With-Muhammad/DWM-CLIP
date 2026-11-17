@@ -18,7 +18,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   const [jobs, account, key] = await Promise.all([listJobs(user.id), accountOf(user), keyInfo(user.id)]);
   return (
     <>
-      <AppHeader email={user.email} plan={account.plan} admin={isAdminEmail(user.email)} />
+      <AppHeader email={user.email} plan={account.plan} planName={account.planName} admin={isAdminEmail(user.email)} />
       <Studio initial={{ jobs, account }} hasKey={Boolean(key)} startUrl={url} />
     </>
   );

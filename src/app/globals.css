@@ -3,6 +3,8 @@
 
 @source "../";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme inline {
   --font-sans: var(--font-funnel-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-funnel-display), var(--font-funnel-sans), ui-sans-serif, system-ui, sans-serif;
@@ -17,34 +19,75 @@
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
-  --color-success: var(--success);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-warn-soft: var(--warn-soft);
   --color-warn-ink: var(--warn-ink);
+  /* The three aurora colours at full strength, for tiles and clip covers in both themes. */
+  --color-tile-pink: #e0218a;
+  --color-tile-violet: #6d3df0;
+  --color-tile-sky: #1a8fd1;
 }
 
-/* DWM Clip: white page, dark green-grey text, one teal accent. No gradients, no glass. */
+/* DWM Clip: aurora colours (pink, violet, sky blue) used flat, never as gradients.
+   Pink is the one colour for actions; violet and sky mark secondary things.
+   Light by default; the dark theme is the same tokens with other values. */
 :root {
-  --canvas: #f6f7f6;
-  --surface: #ffffff;
-  --subtle: #eef0ef;
-  --line: #e2e6e4;
-  --line-strong: #cbd2cf;
-  --ink: #14201e;
-  --ink-2: #33423f;
-  --muted: #5f6d69;
-  --brand: #0e9384;
-  --brand-ink: #0a6f64;
-  --brand-soft: #e3f4f1;
-  --success: #1f7a4d;
-  --danger: #b3382c;
-  --danger-soft: #fbeae7;
-  --warn-soft: #fdf3dc;
+  /* A soft lilac page with slightly lighter cards: never plain white, which glares. */
+  --canvas: #efeaf8;
+  --surface: #f9f7fd;
+  --subtle: #e6e0f3;
+  --line: #dcd5ec;
+  --line-strong: #c4bbdb;
+  --ink: #17122b;
+  --ink-2: #3d3657;
+  --muted: #6b6485;
+  --brand: #d81b84;
+  --brand-hover: #b9146f;
+  --brand-ink: #b3126b;
+  --brand-soft: #fde6f2;
+  --violet: #6d3df0;
+  --violet-soft: #ece6ff;
+  --sky: #1284b8;
+  --sky-soft: #def2fb;
+  --danger: #c0322b;
+  --danger-soft: #fdeceb;
+  --warn-soft: #fff3d4;
   --warn-ink: #7a5a12;
   color-scheme: light;
+}
 
-  /* HeroUI theme tokens, mapped onto the palette above. Light only. */
+:root[data-theme="dark"] {
+  --canvas: #0e0b18;
+  --surface: #171326;
+  --subtle: #221c38;
+  --line: #2c2547;
+  --line-strong: #40376a;
+  --ink: #f3f0fc;
+  --ink-2: #d2cce8;
+  --muted: #a098bf;
+  --brand: #e22a8f;
+  --brand-hover: #f0489f;
+  --brand-ink: #ff7fbd;
+  --brand-soft: #3a1431;
+  --violet: #a48bff;
+  --violet-soft: #271d4d;
+  --sky: #5cc8f2;
+  --sky-soft: #0f2e3d;
+  --danger: #ff8a80;
+  --danger-soft: #3a1715;
+  --warn-soft: #3a2f12;
+  --warn-ink: #f3d17d;
+  color-scheme: dark;
+}
+
+/* HeroUI theme tokens, mapped onto the palette above in both themes. */
+:root,
+:root[data-theme="dark"] {
   --background: var(--canvas);
   --foreground: var(--ink);
   --surface-foreground: var(--ink);
@@ -56,7 +99,7 @@
   --overlay-foreground: var(--ink);
   --accent: var(--brand);
   --accent-foreground: #ffffff;
-  --accent-hover: var(--brand-ink);
+  --accent-hover: var(--brand-hover);
   --default: var(--subtle);
   --default-foreground: var(--ink);
   --default-hover: var(--line);
@@ -67,7 +110,7 @@
   --field-placeholder: color-mix(in srgb, var(--muted) 75%, transparent);
   --field-border: var(--line-strong);
   --field-border-width: 1px;
-  --field-border-hover: #aab4b0;
+  --field-border-hover: var(--muted);
   --field-border-focus: var(--brand);
   --field-hover: var(--surface);
   --field-focus: var(--surface);
@@ -77,15 +120,16 @@
   --link: var(--brand-ink);
   --danger-foreground: #fff;
   --success-foreground: #fff;
-  --backdrop: rgb(20 32 30 / 0.5);
-  --surface-shadow: 0 1px 2px rgb(20 32 30 / 0.05);
-  --overlay-shadow: 0 0 0 1px rgb(20 32 30 / 0.06), 0 24px 60px -24px rgb(20 32 30 / 0.35);
+  --backdrop: rgb(10 7 20 / 0.6);
+  --surface-shadow: 0 1px 2px rgb(23 18 43 / 0.05);
+  --overlay-shadow: 0 0 0 1px rgb(23 18 43 / 0.08), 0 24px 60px -24px rgb(23 18 43 / 0.4);
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -96,7 +140,7 @@
   }
 
   ::selection {
-    background: #bfe8e1;
+    background: color-mix(in srgb, var(--brand) 30%, transparent);
   }
 
   :focus-visible {
@@ -127,26 +171,44 @@
     @apply h-12 px-6 text-[16px] md:h-12;
   }
 
-  /* A white box with a hairline border: the one container style used everywhere. */
+  /* A box with a hairline border: the one container style used everywhere. */
   .card {
     @apply rounded-2xl border border-line bg-surface;
   }
 
+  /* The pink button, for links that look like buttons. */
+  .btn {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-[15px] font-medium text-white transition-colors hover:bg-[var(--brand-hover)];
+  }
+
+  .btn-quiet {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-subtle;
+  }
+
   /* One choice out of a few, shown side by side. */
   .seg {
-    @apply inline-flex rounded-xl border border-line-strong bg-surface p-0.5;
+    @apply inline-flex flex-wrap rounded-xl border border-line-strong bg-surface p-0.5;
   }
 
   .seg > button {
     @apply rounded-[10px] px-3 py-1.5 text-[13.5px] text-ink-2 transition-colors;
   }
 
+  .seg > button:hover {
+    @apply bg-subtle;
+  }
+
   .seg > button[aria-pressed="true"] {
-    @apply bg-ink text-white;
+    @apply bg-ink text-canvas;
   }
 
   .field-native {
-    @apply h-11 w-full rounded-xl border border-line-strong bg-surface px-3.5 text-[15px] text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand;
+    @apply w-full rounded-xl border border-line-strong bg-surface px-3.5 text-[15px] text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand;
+  }
+
+  input.field-native,
+  select.field-native {
+    @apply h-11;
   }
 }
 
@@ -164,6 +226,18 @@
     }
     to {
       background-position: 140% 0;
+    }
+  }
+
+  /* Things that appear: a short fade and rise, so the page feels calm rather than abrupt. */
+  .rise {
+    animation: rise 0.35s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
     }
   }
 }

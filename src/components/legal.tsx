@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /** The plain page used for Terms and Privacy. */
 export function Legal({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
@@ -8,9 +9,12 @@ export function Legal({ title, updated, children }: { title: string; updated: st
     <>
       <header className="mx-auto flex h-16 w-full max-w-[760px] items-center px-4 sm:px-6">
         <Logo />
-        <Link href="/" className="ms-auto text-[14.5px] text-ink-2 hover:text-ink">
-          Home
-        </Link>
+        <span className="ms-auto flex items-center gap-2">
+          <Link href="/" className="text-[14.5px] text-ink-2 hover:text-ink">
+            Home
+          </Link>
+          <ThemeToggle />
+        </span>
       </header>
       <main className="mx-auto w-full max-w-[760px] px-4 pt-6 pb-20 sm:px-6">
         <h1 className="font-display text-[34px]">{title}</h1>

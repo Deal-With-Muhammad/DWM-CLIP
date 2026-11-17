@@ -20,8 +20,10 @@
     // Which service takes payments: "lemonsqueezy" now, "paddle" once Paddle has approved the site.
     "PAYMENTS": "lemonsqueezy",
     // Lemon Squeezy (store "DWM Invite"): each product's checkout link and id. Not secret.
+    "LEMONSQUEEZY_LINK_LITE": "https://pay.dealwithmuhammad.com/checkout/buy/423f1d71-fd6e-47a7-a0e2-a9dc37e685ea",
     "LEMONSQUEEZY_LINK_PRO": "https://pay.dealwithmuhammad.com/checkout/buy/c0916888-e829-4001-89c5-3f59382cf176",
     "LEMONSQUEEZY_LINK_STORAGE": "https://pay.dealwithmuhammad.com/checkout/buy/8cf02f31-100d-4b21-aad7-50edf7b3fd86",
+    "LEMONSQUEEZY_PRODUCT_LITE": "1533120",
     "LEMONSQUEEZY_PRODUCT_PRO": "1533076",
     "LEMONSQUEEZY_PRODUCT_STORAGE": "1533077",
     // Paddle (live account, seller 250501). None of these are secret.

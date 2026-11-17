@@ -42,7 +42,7 @@ function paddle(config: Checkout) {
 }
 
 /** Opens Paddle's checkout for Pro or for extra storage. */
-export function PayButton({ kind, priceId, label, checkout, variant = "primary" }: { kind: "pro" | "storage"; priceId: string; label: string; checkout: Checkout; variant?: "primary" | "outline" }) {
+export function PayButton({ kind, priceId, label, checkout, variant = "primary" }: { kind: "lite" | "pro" | "storage"; priceId: string; label: string; checkout: Checkout; variant?: "primary" | "outline" }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = Boolean(checkout.token && priceId);
