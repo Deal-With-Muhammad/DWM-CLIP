@@ -8,7 +8,7 @@ export default function Terms() {
     <Legal title="Terms" updated="18 November 2026">
       <section>
         <h2>What DWM Clip is</h2>
-        <p>DWM Clip turns a video you give it a link to into short vertical clips. It is operated by Muhammad Ahmad, trading as Deal With Muhammad (dealwithmuhammad.com), referred to here as &quot;we&quot;. By using it you agree to these terms.</p>
+        <p>DWM Clip turns a video you give it a link to into short vertical clips. It is operated by Rafay Khan, trading as Deal With Muhammad (dealwithmuhammad.com), referred to here as &quot;we&quot;. By using it you agree to these terms.</p>
       </section>
       <section>
         <h2>Videos you clip</h2>
