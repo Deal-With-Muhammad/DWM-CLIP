@@ -16,7 +16,14 @@
     "SMTP_FROM": "me@dealwithmuhammad.com",
     // "Our AI" for Pro: the cheapest model that still picks good moments.
     "AI_PROVIDER": "gemini",
-    "AI_MODEL": "gemini-3.5-flash-lite,gemini-2.5-flash-lite"
+    "AI_MODEL": "gemini-3.5-flash-lite,gemini-2.5-flash-lite",
+    // Paddle (live account, seller 250501). None of these are secret.
+    "PADDLE_PRICE_PRO": "pri_01m7nhv6fjjfddgywjn8pfxb5s",
+    "PADDLE_PRICE_STORAGE": "pri_01m7nhy71415w5etdh0d4t9qns",
+    "PADDLE_PORTAL_URL": "https://customer-portal.paddle.com/cpl_01k3zb44pd51y2bfaz2191rvsz"
+    // Add this line (with a comma above) once Paddle has approved clip.dealwithmuhammad.com and verified
+    // the account. Until then the pay buttons stay off, because the checkout would only show an error.
+    // "PADDLE_CLIENT_TOKEN": "live_5b09ac294d15531687be34f4b72"
   }
   // Secrets (set once with `npx wrangler secret put NAME`):
   //   ADMIN_EMAILS                   who may open /admin (comma separated)
@@ -24,6 +31,6 @@
   //   SMTP_USER, SMTP_PASS           the Gmail address + app password that send sign-in codes
   //   AI_KEY                         the Gemini key used for Pro members
   //   ENGINE_URL, ENGINE_SECRET      where the clip engine runs, and the password it shares with this site
-  //   PADDLE_CLIENT_TOKEN, PADDLE_PRICE_PRO, PADDLE_PRICE_STORAGE, PADDLE_WEBHOOK_SECRET,
-  //   PADDLE_PORTAL_URL, and PADDLE_ENV=sandbox while testing (see src/lib/server/billing.ts)
+  //   PADDLE_WEBHOOK_SECRET          the secret key of the "DWM Clip subscriptions" webhook in Paddle
+  //                                  (Events → Notifications); see src/lib/server/billing.ts
 }
