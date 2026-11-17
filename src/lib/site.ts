@@ -7,4 +7,6 @@ export const site = {
   description: "Paste a YouTube, Twitch or Kick link. DWM Clip finds the best moments, cuts them to 9:16, adds captions and a hook, and keeps them ready to post.",
   color: "#0e9384",
   contact: "me@dealwithmuhammad.com",
+  /** Who takes the payment (the merchant of record), named on the Terms, Privacy and Refund pages. */
+  seller: "Lemon Squeezy",
 };

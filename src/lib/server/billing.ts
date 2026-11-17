@@ -24,6 +24,12 @@ import { setting } from "@/lib/server/settings";
 
 export type Kind = "pro" | "storage";
 
+/**
+ * Which service takes payments right now: PAYMENTS = "lemonsqueezy" or "paddle".
+ * Subscriptions from both keep working whichever is switched on, so the move is one setting.
+ */
+export const provider = (): "lemonsqueezy" | "paddle" => (setting("PAYMENTS") === "lemonsqueezy" ? "lemonsqueezy" : "paddle");
+
 const priceFor = (kind: Kind) => setting(kind === "pro" ? "PADDLE_PRICE_PRO" : "PADDLE_PRICE_STORAGE");
 
 export const paymentsEnabled = (kind: Kind = "pro") => Boolean(setting("PADDLE_CLIENT_TOKEN") && priceFor(kind));

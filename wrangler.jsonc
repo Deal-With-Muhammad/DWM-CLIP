@@ -17,6 +17,13 @@
     // "Our AI" for Pro: the cheapest model that still picks good moments.
     "AI_PROVIDER": "gemini",
     "AI_MODEL": "gemini-3.5-flash-lite,gemini-2.5-flash-lite",
+    // Which service takes payments: "lemonsqueezy" now, "paddle" once Paddle has approved the site.
+    "PAYMENTS": "lemonsqueezy",
+    // Lemon Squeezy (store "DWM Invite"): each product's checkout link and id. Not secret.
+    "LEMONSQUEEZY_LINK_PRO": "https://pay.dealwithmuhammad.com/checkout/buy/c0916888-e829-4001-89c5-3f59382cf176",
+    "LEMONSQUEEZY_LINK_STORAGE": "https://pay.dealwithmuhammad.com/checkout/buy/8cf02f31-100d-4b21-aad7-50edf7b3fd86",
+    "LEMONSQUEEZY_PRODUCT_PRO": "1533076",
+    "LEMONSQUEEZY_PRODUCT_STORAGE": "1533077",
     // Paddle (live account, seller 250501). None of these are secret.
     "PADDLE_PRICE_PRO": "pri_01m7nhv6fjjfddgywjn8pfxb5s",
     "PADDLE_PRICE_STORAGE": "pri_01m7nhy71415w5etdh0d4t9qns",
@@ -31,6 +38,8 @@
   //   SMTP_USER, SMTP_PASS           the Gmail address + app password that send sign-in codes
   //   AI_KEY                         the Gemini key used for Pro members
   //   ENGINE_URL, ENGINE_SECRET      where the clip engine runs, and the password it shares with this site
+  //   LEMONSQUEEZY_WEBHOOK_SECRET    the signing secret of the Lemon Squeezy webhook that points at
+  //                                  https://clip.dealwithmuhammad.com/api/billing/lemonsqueezy
   //   PADDLE_WEBHOOK_SECRET          the secret key of the "DWM Clip subscriptions" webhook in Paddle
   //                                  (Events → Notifications); see src/lib/server/billing.ts
 }

@@ -1,4 +1,5 @@
 import { Legal } from "@/components/legal";
+import { site } from "@/lib/site";
 
 export const metadata = { title: "Refund policy" };
 
@@ -12,7 +13,7 @@ export default function Refund() {
       <section>
         <h2>How to ask</h2>
         <p>
-          Email me@dealwithmuhammad.com from the address you signed up with, or reply to the receipt Paddle sent you. Refunds are issued by Paddle, our reseller and Merchant of Record, to the payment method you used, usually within 5 to 10 working days.
+          Email me@dealwithmuhammad.com from the address you signed up with, or reply to the receipt {site.seller} sent you. Refunds are issued by {site.seller}, our reseller and Merchant of Record, to the payment method you used, usually within 5 to 10 working days.
         </p>
       </section>
       <section>

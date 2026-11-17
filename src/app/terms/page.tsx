@@ -1,5 +1,6 @@
 import { Legal } from "@/components/legal";
 import { FREE, PRO, formatBytes } from "@/lib/plans";
+import { site } from "@/lib/site";
 
 export const metadata = { title: "Terms" };
 
@@ -27,7 +28,7 @@ export default function Terms() {
       <section>
         <h2>Payments and refunds</h2>
         <p>
-          Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns. You can cancel any time from Settings and keep Pro until the end
+          Our order process is conducted by our online reseller {site.seller}. {site.seller} is the Merchant of Record for all our orders, and handles payment questions and returns. You can cancel any time from Settings and keep Pro until the end
           of the paid month. Refunds are covered by the <a href="/refund" className="text-brand-ink underline underline-offset-4">refund policy</a>.
         </p>
       </section>

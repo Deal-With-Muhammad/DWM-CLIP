@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { FREE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
-import { checkoutConfig, paymentsEnabled, portalUrl } from "@/lib/server/billing";
+import { checkoutConfig, paymentsEnabled, portalUrl, provider } from "@/lib/server/billing";
+import { lemonCheckout } from "@/lib/server/lemonsqueezy";
+import { site } from "@/lib/site";
 import { keyInfo } from "@/lib/server/keys";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
@@ -17,10 +19,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (!user) redirect("/login?next=/app/settings");
   const [account, key, q] = await Promise.all([accountOf(user), keyInfo(user.id), searchParams]);
   const pro = account.plan === "pro";
-  const canPay = paymentsEnabled("pro");
+  // Lemon Squeezy sends the member to its own checkout page; Paddle opens its checkout over this one.
+  const lemon = provider() === "lemonsqueezy";
   const paddle = checkoutConfig();
   const checkout = { sandbox: paddle.sandbox, token: paddle.token, userId: user.id, email: user.email };
-  const portal = portalUrl();
+  const proLink = lemon ? lemonCheckout("pro", user.id) : null;
+  const storageLink = lemon ? lemonCheckout("storage", user.id) : null;
+  const canPay = lemon ? Boolean(proLink) : paymentsEnabled("pro");
+  const canAddStorage = lemon ? Boolean(storageLink) : paymentsEnabled("storage");
+  const portal = account.portal ?? (lemon ? null : portalUrl());
   return (
     <>
       <AppHeader email={user.email} plan={account.plan} admin={isAdminEmail(user.email)} />
@@ -48,7 +55,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 {account.proEnds && ` Your plan is cancelled and stays on until ${new Date(account.proEnds).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`}
               </p>
               <div className="mt-4 flex flex-wrap gap-2.5">
-                {paymentsEnabled("storage") && <PayButton kind="storage" priceId={paddle.prices.storage} checkout={checkout} label={`Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`} variant="outline" />}
+                {canAddStorage &&
+                  (storageLink ? (
+                    <a href={storageLink} className="inline-flex h-11 items-center rounded-xl border border-line-strong px-5 text-[15px] font-medium hover:bg-subtle">
+                      Add {formatBytes(STORAGE_PACK.bytes)} for ${STORAGE_PACK.price}/month
+                    </a>
+                  ) : (
+                    <PayButton kind="storage" priceId={paddle.prices.storage} checkout={checkout} label={`Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`} variant="outline" />
+                  ))}
                 {portal && (
                   <a href={portal} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center rounded-xl px-4 text-[15px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
                     Manage or cancel
@@ -76,9 +90,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <li>1080p, videos up to {PRO.maxHours} hours, {PRO.clipsPerVideo} clips per video</li>
                 </ul>
                 <div className="mt-4">
-                  <PayButton kind="pro" priceId={paddle.prices.pro} checkout={checkout} label={`Go Pro for $${PRO.price}/month`} />
+                  {proLink ? (
+                    <a href={proLink} className="inline-flex h-11 items-center rounded-xl bg-brand px-5 text-[15px] font-medium text-white hover:bg-brand-ink">
+                      Go Pro for ${PRO.price}/month
+                    </a>
+                  ) : (
+                    <PayButton kind="pro" priceId={paddle.prices.pro} checkout={checkout} label={`Go Pro for $${PRO.price}/month`} />
+                  )}
                 </div>
-                <p className="mt-2 text-[12.5px] text-muted">{canPay ? "Cancel any time. Payment is handled by Paddle, our reseller." : "Card payments open soon."}</p>
+                <p className="mt-2 text-[12.5px] text-muted">{canPay ? `Cancel any time. Payment is handled by ${site.seller}, our reseller.` : "Card payments open soon."}</p>
               </div>
             </div>
           )}

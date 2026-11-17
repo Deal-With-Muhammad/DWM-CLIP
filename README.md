@@ -21,7 +21,7 @@ The website starts a job on the engine (`ENGINE_URL`), and the engine sends prog
 ## Plans
 
 Set in `src/lib/plans.ts`. Free: 2 clips with the member's own AI key, 200 MB. Pro: $9/month, 100 clips a month
-with our AI key, 5 GB, plus 10 GB blocks at $2/month. Payments: `src/lib/server/billing.ts` (Paddle); Paddle calls `/api/billing/webhook`.
+with our AI key, 5 GB, plus 10 GB blocks at $2/month. Payments: Lemon Squeezy for now (`src/lib/server/lemonsqueezy.ts`, webhook `/api/billing/lemonsqueezy`), Paddle ready beside it (`src/lib/server/billing.ts`, webhook `/api/billing/webhook`). `PAYMENTS` in `wrangler.jsonc` picks which one the pay buttons use; `seller` in `src/lib/site.ts` is the name shown on the legal pages.
 
 ## Run it on this computer
 
@@ -53,7 +53,7 @@ npm run cf:deploy
 ```
 
 Secrets on the `dwm-clip` Worker (`npx wrangler secret put NAME`): `SESSION_SECRET`, `ENGINE_SECRET`, `ENGINE_URL`,
-`SMTP_USER`, `SMTP_PASS`, `AI_KEY`, `ADMIN_EMAILS`, and the `PADDLE_*` values listed in `wrangler.jsonc`.
+`SMTP_USER`, `SMTP_PASS`, `AI_KEY`, `ADMIN_EMAILS`, `LEMONSQUEEZY_WEBHOOK_SECRET`, and the `PADDLE_*` values listed in `wrangler.jsonc`.
 
 The engine: `cd engine/cloudflare && npx wrangler deploy` (Workers Paid plan, Docker running), then
 `npx wrangler secret put ENGINE_SECRET` there with the same value as the website.

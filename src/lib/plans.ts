@@ -1,5 +1,5 @@
 // What each plan gives. One place, used by the pages and by the server checks.
-// Prices are what Paddle charges; change them there too.
+// Prices are what Lemon Squeezy and Paddle charge; change them there too.
 
 export const MB = 1024 * 1024;
 export const GB = 1024 * MB;

@@ -1,4 +1,5 @@
 import { Legal } from "@/components/legal";
+import { site } from "@/lib/site";
 
 export const metadata = { title: "Privacy" };
 
@@ -7,7 +8,7 @@ export default function Privacy() {
     <Legal title="Privacy" updated="18 November 2026">
       <section>
         <h2>What is stored</h2>
-        <p>Your email address (to sign you in), the video links you paste, the clips made from them, and how many clips you&apos;ve made. If you add an AI key, it is stored encrypted and never shown again. If you pay, Paddle (our reseller and Merchant of Record) handles the card and your billing details; this site only learns that you have a subscription.</p>
+        <p>Your email address (to sign you in), the video links you paste, the clips made from them, and how many clips you&apos;ve made. If you add an AI key, it is stored encrypted and never shown again. If you pay, {site.seller} (our reseller and Merchant of Record) handles the card and your billing details; this site only learns that you have a subscription.</p>
       </section>
       <section>
         <h2>Who else sees it</h2>
@@ -18,7 +19,7 @@ export default function Privacy() {
       </section>
       <section>
         <h2>Cookies</h2>
-        <p>One cookie keeps you signed in. There are no advertising or tracking cookies. Paddle sets its own cookies inside its checkout when you pay.</p>
+        <p>One cookie keeps you signed in. There are no advertising or tracking cookies. {site.seller} sets its own cookies on its checkout page when you pay.</p>
       </section>
       <section>
         <h2>Deleting your data</h2>
