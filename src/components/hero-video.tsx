@@ -22,7 +22,8 @@ export function HeroVideo({ className }: { className?: string }) {
   }, []);
   return (
     <video ref={video} className={className} poster="/hero.jpg" muted loop playsInline autoPlay preload="metadata" aria-hidden tabIndex={-1}>
-      <source src="/hero.mp4" type="video/mp4" />
+      {/* /hero-film is public/hero.mp4 behind a route that can send part of the file, which iPhones insist on. */}
+      <source src="/hero-film" type="video/mp4" />
     </video>
   );
 }
