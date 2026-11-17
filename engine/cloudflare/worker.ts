@@ -1,7 +1,6 @@
 // The clip engine's Worker. Each video gets its own container (a Durable Object named after the job),
 // which runs server.py from the image, takes the one job, and exits when the clips are made.
-// Follows Cloudflare's "Durable Object Container API" guide. Not yet run in production: test it
-// with one short video after the first deploy.
+// Follows Cloudflare's "Durable Object Container API" guide.
 import { DurableObject } from "cloudflare:workers";
 
 type Env = { ENGINE: DurableObjectNamespace<ClipEngine>; ENGINE_SECRET: string; YTDLP_PROXY?: string };
