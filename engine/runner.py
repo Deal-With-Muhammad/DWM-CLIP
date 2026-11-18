@@ -183,13 +183,20 @@ def keep_ai_reason(ai):
     """The engine turns a refused AI call into a sentence about its own dashboard and drops what the service
     said. That reply (which model, which limit) is what tells a member, or us, what to change, so it is kept."""
     call = ai.call
+    waited = set()
 
     def kept(model, *a, **k):
         try:
             return call(model, *a, **k)
         except Exception as e:  # noqa: BLE001 - noted, then left to the engine as before
             AI_SAID.setdefault(str(model), str(e)[:400])     # the first reply for each model tried
-            raise
+            # A free key answers only a few questions a minute, and the engine's own retries all fall inside
+            # that minute. Once per model, wait for the next minute and ask again before giving up on it.
+            if "HTTP 429" not in str(e) or model in waited or k.get("timeout") or (len(a) > 2 and a[2]):
+                raise
+            waited.add(model)
+            time.sleep(45)
+            return call(model, *a, **k)
 
     ai.call = kept
 
