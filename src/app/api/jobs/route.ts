@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { cleanLook } from "@/lib/look";
-import { ENGINE_LAYOUT, LAYOUTS, RETIRED_MODELS, SITES, STYLES } from "@/lib/plans";
+import { videoUrl } from "@/lib/link";
+import { ENGINE_LAYOUT, LAYOUTS, RETIRED_MODELS, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
-import { engineReady, startJob } from "@/lib/server/engine";
+import { ALL_PLACES, engineReady, startJob } from "@/lib/server/engine";
 import { hit } from "@/lib/server/auth-helpers";
 import { fail, siteOrigin } from "@/lib/server/http";
 import { keyFor } from "@/lib/server/keys";
@@ -22,25 +23,13 @@ export async function GET() {
   return NextResponse.json({ jobs, account }, { headers: { "cache-control": "no-store" } });
 }
 
-function videoUrl(raw: unknown) {
-  if (typeof raw !== "string" || raw.length > 500) return null;
-  try {
-    const u = new URL(raw.trim());
-    const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, "");
-    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-    return SITES.some((s) => host === s || host.endsWith(`.${s}`)) ? u.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
 const between = (v: unknown, lo: number, hi: number, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : fallback);
 
 // POST: start clipping a link.
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
-  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown };
+  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown; from?: unknown; place?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -110,7 +99,20 @@ export async function POST(req: Request) {
     at,
   );
   try {
-    await startJob({ id, url, callback: `${siteOrigin(req)}/api/engine`, options, ai, max_hours: account.maxHours, focus, look: body.style === "custom" ? cleanLook(body.look) : null });
+    await startJob({
+      id,
+      url,
+      callback: `${siteOrigin(req)}/api/engine`,
+      options,
+      ai,
+      max_hours: account.maxHours,
+      focus,
+      look: body.style === "custom" ? cleanLook(body.look) : null,
+      // For a video longer than the plan takes at once: where the member wants the clipped stretch to start.
+      from: typeof body.from === "number" && Number.isFinite(body.from) ? Math.max(0, Math.round(body.from)) : 0,
+      // Where the link check got through to the video site, so the video starts there too.
+      place: typeof body.place === "string" && ALL_PLACES.includes(body.place) ? body.place : "",
+    });
   } catch (e) {
     const busy = e instanceof Error && e.message === "busy";
     console.error("engine start", e);

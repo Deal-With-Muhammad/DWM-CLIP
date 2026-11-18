@@ -6,6 +6,7 @@ This file starts it for one job, sends progress to the website, and uploads each
 `studio` is kept exactly as PeakCut publishes it; the few things done differently are set from here.
 
 Run as:  python runner.py <job.json>      (server.py does this; the file is deleted as soon as it is read)
+         python runner.py --check <link>  (looks at a link without making anything, and prints what it found)
 """
 import base64
 import gzip
@@ -97,7 +98,7 @@ def explain(e, signed_in=False):
         return ("This video is age-restricted on YouTube and our YouTube sign-in needs renewing. Please try again later." if signed_in
                 else "This video is age-restricted on YouTube, so it can't be clipped yet. Try a different video.")
     if re.search(r"not a bot|confirm you.?re not|isn't letting .* download", s, re.I):
-        return "YouTube refused to give this video to our server just now. Try again in a few minutes, or use a Twitch or Kick link."
+        return "YouTube is turning our servers away right now. Try again in a few minutes, or use a Twitch or Kick link."
     if isinstance(e, live_source.NoRecording) or "live stream couldn't be fetched" in s or "isn't in its recording yet" in s or "only just started" in s:
         return s
     if re.search(r"is a live stream|live event will begin|Premieres in|is offline", s, re.I):
@@ -113,10 +114,123 @@ def explain(e, signed_in=False):
         return "This video is private, members-only, removed or blocked in some countries, so it can't be fetched."
     if re.search(r"\b403\b|Forbidden", s):
         return "The video site refused the download. Please try again in a few minutes."
+    if DROPPED.search(s):
+        return "The connection to the video site kept dropping. Please try again in a few minutes."
+    if re.search(r"Unsupported URL|is not a valid URL|Unable to recognize|no video (formats|could be) found|not a single video|youtube:tab|channel/playlist", s, re.I):
+        return "That link doesn't lead to a video. Paste the link of one video or one live stream."
+    # Anything else the downloader says about a video: its own sentence, without the tool's labels in front.
+    plain = re.match(r"ERROR: \[[\w:+-]+\] [^:\s]+: (.{8,300})", s, re.S)
+    if plain:
+        return plain.group(1).strip()
     return None
 
 
+# YouTube asking our server to prove it isn't a robot: a refusal of the address the container got, not of the video.
+REFUSED = re.compile(r"not a bot|confirm you.?re not|isn't letting .* download", re.I)
+# A download that broke off part way. The same video usually comes through on the next try.
+DROPPED = re.compile(r"timed out|Connection reset|IncompleteRead|Connection aborted|Temporary failure in name resolution|Remote end closed", re.I)
+# Other parts of the world a job can be handed to (Cloudflare's names), in the order they are tried. Looked at
+# on 2026-11-19: YouTube turned away our containers in Frankfurt, Warsaw and Seattle, and accepted the ones in
+# London, Amsterdam, Chicago, Atlanta, Singapore, Tokyo and Sydney.
+PLACES = ["weur", "enam", "apac", "apac-ne"]
+
+
+def whereabouts() -> dict:
+    """Where this container reaches the internet from: Cloudflare's nearest location and the country of its address."""
+    try:
+        text = httpx.get("https://www.cloudflare.com/cdn-cgi/trace", timeout=4, trust_env=False).text
+        got = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+        return {"colo": got.get("colo", ""), "country": got.get("loc", ""), "ip": got.get("ip", "")}
+    except Exception:  # noqa: BLE001 - only for the logs
+        return {}
+
+
+def move(spec) -> bool:
+    """A container starts near the member who asked, and YouTube turns away the addresses of some places, so
+    the same member was refused time after time while others got through. The whole job is handed to a
+    container in another part of the world, and this one stops. True when another one has taken it."""
+    engine, secret = str(spec.get("engine") or ""), os.environ.get("ENGINE_SECRET", "")
+    tried = [str(p) for p in spec.get("tried") or [spec.get("place") or ""]]
+    nxt = next((p for p in PLACES if p not in tried), None)
+    if not engine.startswith("https://") or not secret or nxt is None or len(tried) >= 4:
+        return False
+    try:
+        r = httpx.post(engine.rstrip("/") + "/jobs", json=dict(spec, place=nxt, tried=tried + [nxt]), trust_env=False,
+                       headers={"Authorization": "Bearer " + secret}, timeout=httpx.Timeout(90, connect=10))
+        return r.status_code < 300
+    except httpx.HTTPError:
+        return False
+
+
+def check(url: str) -> dict:
+    """What a link is, before anything is made from it: its name and length, or why it can't be clipped."""
+    out = {"ok": False, "where": whereabouts()}
+    try:
+        from studio import media, safe
+        signed_in = sign_in(media)
+        try:
+            i, _raw = live_source.look(url, media)
+            if i["kind"] != "video" or not i["title"]:
+                raise RuntimeError("That link is a channel or playlist, not a single video. Paste the link of one video.")
+            out.update(ok=True, title=i["title"][:200], uploader=i["uploader"][:120], seconds=round(i["duration"]), live=i["is_live"],
+                       thumb=i["thumbnail"] if str(i["thumbnail"]).startswith("https://") else "")
+            if i["is_live"]:
+                # On air: how much has been broadcast so far, and whether the site keeps it to cut from.
+                stream = live_source.open_live(url, media)
+                if not stream:
+                    raise RuntimeError("This is a live stream with nothing recorded to clip from.")
+                so_far = stream.length()
+                if so_far < 120:
+                    raise live_source.NoRecording("This stream has only just started. Give it a few minutes, then paste the link again.")
+                out.update(seconds=round(so_far), title=(stream.title or i["title"])[:200])
+        except Exception as e:  # noqa: BLE001
+            out.update(ok=False, refused=bool(REFUSED.search(str(e))), error=explain(e, signed_in) or safe.friendly(e, 300))
+    except Exception as e:  # noqa: BLE001
+        out.update(ok=False, error=str(e)[-300:])
+    return out
+
+
+def liveliest(brain, db, words, n, min_len, max_len, duration, taken) -> list:
+    """Up to n stretches of the video that no clip covers yet, the loudest first. Where there is talking, a
+    stretch starts on a line and ends where a sentence ends, the same as a clip the AI picked."""
+    import numpy as np
+    z = brain.loud_zscore(db)
+    lines = brain.make_lines(words, z)
+    said = np.array([w["s"] for w in words]) if words else np.zeros(0)
+    length = min((min_len + max_len) / 2, duration)
+    least = min(min_len, duration) - 1
+    picks = []
+
+    def clear(s, e):
+        return all(e <= a - 2 or s >= b + 2 for a, b in list(taken) + [(p["start"], p["end"]) for p in picks])
+
+    for must_talk in (True, False):
+        for sec in np.argsort(-z, kind="stable")[:2000]:
+            if len(picks) >= n:
+                return picks
+            # Most of the stretch comes before the loud second: what led up to it, then the reaction.
+            e = min(duration, max(0.0, float(sec) - length * 0.6) + length)
+            s = max(0.0, e - length)
+            if e - s < least or not clear(s, e):
+                continue
+            talk = int(np.searchsorted(said, e, "right") - np.searchsorted(said, s, "left"))
+            if must_talk and talk < 8:
+                continue
+            if talk:
+                s, e = brain._snap({"start": s, "end": e}, lines, words, min_len, max_len, duration)
+                if e - s < least or not clear(s, e):
+                    continue
+            picks.append({"start": round(s, 2), "end": round(e, 2), "text": " ".join(w["w"] for w in words if s <= w["s"] <= e)})
+    return picks
+
+
 def main(spec_path: str):
+    if spec_path == "--check":
+        os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="clipcheck-")
+        os.environ["PEAKCUT_UPDATE_CHECK"] = "0"
+        sys.path.insert(0, str(HERE))
+        print("CHECK " + json.dumps(check(sys.argv[2])), flush=True)
+        return 0
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     Path(spec_path).unlink(missing_ok=True)          # it holds an AI key
 
@@ -247,6 +361,8 @@ def make(spec, web, work):
             return 0
 
     live = {"on": False, "base": 0.0, "url": "", "whole": True, "hours": 0}
+    part = {"on": False, "from": 0.0, "hours": 0}      # a video longer than the plan takes at once: the stretch that is clipped
+    kept = {}                                           # the video's sound and loudness, for clips added at the end
     try:
         from studio import auth, brain, ctx, db, facecam, jobs, media, render, roman, safe
 
@@ -333,10 +449,48 @@ def make(spec, web, work):
 
         render.render_clip = render_clip
 
+        # The video's sound and how loud each second is are worked out once by the engine. They are kept, so
+        # that clips can still be added once it has finished (see top_up).
+        load, loud = media.load_audio, media.loudness_per_second
+
+        def load_audio(wav):
+            sound = load(wav)
+            if Path(wav).name == "audio.wav":
+                kept["audio"] = sound
+            return sound
+
+        def loudness(sound):
+            kept["db"] = loud(sound)
+            return kept["db"]
+
+        media.load_audio, media.loudness_per_second = load_audio, loudness
+
         # The title is read first: it names the game (GTA VI and so on), which decides the hooks and hashtags.
-        tell({"status": "running", "stage": "Opening the video", "progress": 0.01})
-        first = media.info(spec["url"])
+        where = whereabouts()
+        print("engine at", spec["id"], where.get("colo"), where.get("country"), "place:", spec.get("place") or "near the member", flush=True)
+        tell({"status": "running", "stage": "Opening the video", "progress": 0.01, "where": f"{where.get('colo', '')} {where.get('country', '')}".strip()})
+        first, raw = live_source.look(spec["url"], media)
+        if first["kind"] != "video":
+            raise RuntimeError("That link is a channel or playlist, not a single video. Paste the link of one video.")
         name = first["title"]
+        most = float(spec.get("max_hours") or 3) * 3600
+        if not first["is_live"]:
+            # A video longer than the plan takes at once is not turned away: one stretch of it is clipped, as long
+            # as the plan allows, from where the member chose (the start, if they didn't). The engine sees that
+            # stretch as a video starting at zero, the same as it does for a live stream.
+            long = first["duration"] > most + 1
+            stream = live_source.open_recording(spec["url"], media, raw, part=long)
+            if long:
+                try:
+                    start = float(spec.get("from") or 0)
+                except (TypeError, ValueError):
+                    start = 0.0
+                live["base"] = stream.align(min(max(0.0, start), stream.length() - most))
+                part.update(on=True, hours=most / 3600)
+                part["from"] = live["base"]
+                live_source.use(media, stream, live["base"], min(most, stream.length() - live["base"]))
+            elif stream:
+                live_source.use(media, stream)      # a stream that ended a short while ago: its pieces are fetched by number
         if first["is_live"]:
             # On air right now: the clips come from what has been broadcast so far. The most recent hours are
             # looked at, as many as the plan takes, and the engine sees them as a video that starts at zero.
@@ -344,7 +498,7 @@ def make(spec, web, work):
             stream = live_source.open_live(spec["url"], media)
             if not stream:
                 raise RuntimeError("This is a live stream with nothing recorded to clip from.")
-            so_far, most = stream.length(), float(spec.get("max_hours") or 3) * 3600
+            so_far = stream.length()
             if so_far < 120:
                 raise live_source.NoRecording("This stream has only just started. Give it a few minutes, then paste the link again.")
             # A piece of the recording is up to twelve seconds long, and the stretch must not run over the plan's hours.
@@ -355,6 +509,10 @@ def make(spec, web, work):
         job = jobs.create({"type": "url", "url": spec["url"], "name": name}, options, enqueue=False)
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
+        if REFUSED.search(str(e)):
+            tell({"status": "running", "stage": "YouTube turned this server away, trying another one", "progress": 0.01})
+            if move(spec):
+                return 0
         try:
             from studio import safe as _safe
             why = explain(e, bool(os.environ.get("YT_COOKIES"))) or _safe.friendly(e, 300)
@@ -363,21 +521,83 @@ def make(spec, web, work):
         tell({"status": "error", "stage": "Stopped", "progress": 0, "error": why})
         return 1
 
+    moved = []
+
+    def top_up():
+        """The member asked for a number of clips. The AI is told to skip weak moments and may pick fewer; a busy
+        AI service leaves parts of a video unread; a video with almost no talking is never shown to it at all.
+        Whatever the reason, the clips still missing are made from the liveliest stretches no clip covers yet."""
+        o = job["options"]
+        made = lambda: sum(1 for c in job["clips"] if c.get("status") == "done")     # noqa: E731
+        want = int(o["max_clips"]) - made()
+        sound, db_ = kept.get("audio"), kept.get("db")
+        if want <= 0 or sound is None or db_ is None or full:
+            return
+        try:
+            words = json.loads((Path(job["dir"]) / "words.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            words = []
+        kept["quiet"] = len(words) < 8
+        length = float(job.get("duration") or len(db_))
+        picks = liveliest(brain, db_, words, want + 2, int(o["min_len"]), int(o["max_len"]), length, [(c["start"], c["end"]) for c in job["clips"]])
+        answered = bool((job.get("ai") or {}).get("model"))
+        for pick in picks:
+            if made() >= int(o["max_clips"]):
+                break
+            job.update(status="running", stage="Making one more clip", progress=0.95)
+            text = pick.pop("text")
+            # A heading and title for it, when the AI has been answering for this video. Without them the clip
+            # goes out plain, under the video's own title.
+            said = brain.describe(text, job.get("title") or "", job.get("uploader") or "", job.get("game") or None, timeout=45) if answered else {}
+            c = {"score": 50, "category": "other", "hook": "", "title": "", "description": "", "hashtags": [], "highlight_words": [], **said,
+                 "reason": "Picked as one of the liveliest parts, to make up the number of clips asked for.", **pick,
+                 "id": f"clip{len(job['clips']) + 1:02d}", "style": o["style"], "layout": o["layout"], "captions": o.get("captions", True),
+                 "status": "queued", "version": 0}
+            c["score"] = c["score"] or 50
+            box = find_facecam(job) if o["layout"] == "gameplay" else None
+            if box:
+                c["facecam"] = box
+            job["clips"].append(c)
+            here = job.get("source_path") and Path(job["source_path"]).is_file()
+            if job["source"]["type"] == "url" and not here:
+                jobs._fetch_piece(job, c, sound)
+            if c["status"] != "error":
+                jobs.render_one(job, c, words)
+            if c.get("status") == "done":
+                kept["topped"] = kept.get("topped", 0) + 1
+        kept["room"] = made() < int(o["max_clips"])       # still short: the video has no more room for clips of this length
+        job.update(status="done", stage="Done" if made() else "Done, but nothing clip-worthy was found", progress=1.0)
+
     def run():
         ctx.set_uid(uid)
         try:
-            # A video site sometimes refuses one download ("403 Forbidden") and accepts the next. Before any
-            # clip exists, the video is simply started again, twice at most.
+            # A video site sometimes refuses one download ("403 Forbidden"), or the connection drops part way,
+            # and the next try goes through. Before any clip exists, the video is simply started again, twice at most.
             for attempt in range(3):
                 try:
                     jobs._run_job(job)
                     break
                 except Exception as e:  # noqa: BLE001
-                    if attempt == 2 or job["clips"] or not re.search(r"\b403\b|Forbidden", str(e)):
+                    if job["clips"]:
+                        raise
+                    if REFUSED.search(str(e)):
+                        # YouTube won't serve this container's address at all: another one, elsewhere, takes the video.
+                        job.update(status="running", stage="YouTube turned this server away, trying another one", error=None)
+                        if move(spec):
+                            moved.append(True)
+                            return
+                        raise
+                    if attempt == 2 or not (re.search(r"\b403\b|Forbidden", str(e)) or DROPPED.search(str(e))):
                         raise
                     traceback.print_exc()
+                    media._yt_refused_until = 0.0
                     job.update(status="running", stage="The video site refused the download, trying again", error=None)
                     time.sleep(6 + 6 * attempt)
+            try:
+                top_up()
+            except Exception:  # noqa: BLE001 - the clips already made are not lost over an extra one
+                traceback.print_exc()
+                job.update(status="done", stage="Done" if job["clips"] else "Done, but nothing clip-worthy was found", progress=1.0)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             for c in job["clips"]:
@@ -385,10 +605,9 @@ def make(spec, web, work):
                     c.update(status="error", error="The video stopped before this clip was made.")
             job.update(status="error", error=explain(e, signed_in) or safe.friendly(e), stage="Stopped")
 
+    sent, last, full = set(), None, False
     worker = threading.Thread(target=run, daemon=True)
     worker.start()
-
-    sent, last, full = set(), None, False
 
     def words_near(clip) -> list:
         """The words spoken around this clip, kept so the clip can be remade later without the whole video."""
@@ -439,9 +658,14 @@ def make(spec, web, work):
         body = {
             "status": job["status"] if final or job["status"] != "done" else "running",
             "stage": job.get("stage") or "", "progress": round(float(job.get("progress") or 0), 3),
-            "title": job.get("title") or "", "uploader": job.get("uploader") or "", "duration": round((job.get("duration") or 0) + base),
+            "title": job.get("title") or "", "uploader": job.get("uploader") or "", "duration": round(first["duration"] if part["on"] else (job.get("duration") or 0) + base),
             # A live stream: where its recording is, and how much of it the clips were picked from.
             "live": live["on"], "source_url": live["url"], "live_whole": live["whole"], "live_hours": live["hours"],
+            # A video longer than the plan takes at once: where the stretch that was clipped starts, and how long it is.
+            "part": part["on"], "part_from": round(part["from"]), "part_hours": part["hours"],
+            # Clips added at the end to make up the number asked for; whether the video had no more room; no talking in it.
+            "asked": int((job.get("options") or {}).get("max_clips") or 0), "topped": kept.get("topped", 0),
+            "no_room": bool(kept.get("room")), "quiet": bool(kept.get("quiet")),
             "game": job.get("game") or "", "error": job.get("error"),
             "model": (job.get("ai") or {}).get("model"), "tokens": (job.get("ai") or {}).get("tokens", 0),
             "note": (job.get("ai") or {}).get("note") or "",
@@ -462,6 +686,8 @@ def make(spec, web, work):
     while worker.is_alive():
         report()
         time.sleep(1.5)
+    if moved:
+        return 0                                  # another container has the video now, and reports on it from here
     if job["status"] not in ("done", "error"):
         job.update(status="error", error="The video stopped unexpectedly.", stage="Stopped")
     report(final=True)
@@ -493,6 +719,15 @@ def remake(spec, web, work):
                 stream = None
             if stream:
                 live_source.use(media, stream)
+        if not spec.get("live") or not stream:
+            # A YouTube stream that ended a short while ago is still in numbered pieces, which are fetched by number.
+            try:
+                _, raw = live_source.look(spec["url"], media)
+                ended = None if raw.get("is_live") else live_source.open_recording(spec["url"], media, raw)
+                if ended:
+                    live_source.use(media, ended)
+            except Exception:  # noqa: BLE001 - the link is fetched the ordinary way, and says what is wrong there
+                traceback.print_exc()
         if use_look(render, clip.get("look")):
             clip = dict(clip, style="custom")
         start, end = float(clip["start"]), float(clip["end"])

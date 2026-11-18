@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { first, nowIso, run } from "@/lib/server/db";
+import { hoursWord, moment } from "@/lib/link";
 import { checkJobToken } from "@/lib/server/engine";
 
 // The clip engine reports how a video is going. 410 tells it the video was deleted, so it stops.
@@ -16,6 +17,12 @@ export async function POST(req: Request) {
   const status = b.status === "done" || b.status === "error" ? b.status : "running";
   const at = nowIso();
   const failed = Array.isArray(b.failed) ? b.failed.length : 0;
+  // Which part of the world the engine's container is in, for working out who the video sites turn away.
+  if (typeof b.where === "string" && b.where) console.log("engine at", id, b.where);
+  // Clips added at the end to make up the number asked for, and the clips that came out in all.
+  const topped = Math.round(num(b.topped));
+  const made = Math.round(num(b.found)) - failed;
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.replace("#", String(n)));
   let note = text(b.note, 300);
   // The AI gave no answer: say so, with the service's own reason, in words about this site (the engine's name
   // things only its own dashboard has). This matters more than the note about the webcam, so it is kept.
@@ -44,10 +51,25 @@ export async function POST(req: Request) {
       const last = hours >= 1 ? `${hours === 1 ? "hour" : `${Math.round(hours)} hours`}` : `${Math.round(hours * 60)} minutes`;
       parts.push(b.live_whole === true ? "This stream was live, so the clips come from what had been broadcast so far." : `This stream was live. The clips come from its last ${last}, the most your plan takes.`);
     }
+    // A video longer than the plan takes at once: which stretch of it the clips come from.
+    if (b.part === true && status !== "error") {
+      const hours = num(b.part_hours);
+      parts.push(`This video is longer than your plan takes at once, so the clips come from the ${hoursWord(hours)} starting at ${moment(num(b.part_from))}.`);
+    }
     if (b.facecam === false && status !== "error") parts.push("There is no streamer webcam in it, so the game fills the screen.");
-    // Parts of a long video the AI service never answered for (a busy or rate-limited key): they have no clips.
     const skipped = Math.round(num(b.ai_skipped));
-    if (skipped > 0 && status === "done") parts.push(`The AI service was too busy to look at ${skipped === 1 ? "one part" : `${skipped} parts`} of it, so ${skipped === 1 ? "that part has" : "those have"} no clips.`);
+    if (status === "done" && b.quiet === true && made > 0) {
+      parts.push(`Nobody talks in this video, so ${plural(made, "the clip is its loudest moment", "the clips are its loudest moments")}.`);
+    } else if (status === "done" && topped > 0) {
+      // The AI chose fewer moments than were asked for (it is told to skip weak ones), or its service was too
+      // busy to read every part. The rest were made from the liveliest stretches, so the number asked for is there.
+      const why = skipped > 0 ? "The AI service was too busy to read all of it" : made - topped <= 0 ? "The AI found no moment it rated" : `The AI picked only ${plural(made - topped, "one moment", "# moments")}`;
+      parts.push(`${why}, so ${plural(topped, "one clip comes", "# clips come")} from the liveliest parts of the video instead.`);
+    } else if (skipped > 0 && status === "done") {
+      // Parts of a long video the AI service never answered for (a busy or rate-limited key).
+      parts.push(`The AI service was too busy to look at ${skipped === 1 ? "one part" : `${skipped} parts`} of it, so ${skipped === 1 ? "that part has" : "those have"} no clips.`);
+    }
+    if (status === "done" && b.no_room === true && made > 0 && made < Math.round(num(b.asked))) parts.push(`It only has room for ${plural(made, "one clip", "# clips")} of this length.`);
     if (parts.length) note = parts.join(" ");
   }
   if (b.storage_full === true) note = "Your storage filled up, so the rest of the clips weren't saved.";

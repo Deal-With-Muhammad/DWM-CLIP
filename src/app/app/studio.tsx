@@ -5,14 +5,26 @@ import { Check, Copy, Download, Link2, Loader, Minus, Pencil, Play, Plus, Trash2
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { LAYOUTS, formatBytes } from "@/lib/plans";
+import { LAYOUTS, MB, formatBytes } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
 import { CaptionChoice } from "./look-picker";
 
 type Data = { jobs: Job[]; account: Account };
+
+// What the pasted link turned out to be. It is looked at as soon as it is pasted, so a video that can't be
+// clipped says so before "Make clips" and not after. "unknown" means it couldn't be looked at just now, and
+// the video may still be started.
+type Found =
+  | { state: "none" | "looking" | "unknown" }
+  | { state: "bad"; text: string; again: boolean }
+  | { state: "ok"; title: string; uploader: string; seconds: number; live: boolean; thumb: string; place: string; planSeconds: number };
+
+// Roughly what one finished clip takes up, for saying when the storage left won't hold the clips asked for.
+const CLIP_BYTES = 25 * MB;
 
 const busy = (j: Job) => j.status === "queued" || j.status === "running";
 
@@ -38,6 +50,9 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<{ text: string; upgrade?: boolean; needsKey?: boolean } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [found, setFound] = useState<Found>({ state: videoUrl(startUrl) ? "looking" : "none" });
+  const [from, setFrom] = useState(0);
+  const [lookAgain, setLookAgain] = useState(0);
   const { account, jobs } = data;
   const free = account.plan === "free";
   const working = jobs.some((j) => busy(j) || j.clips.some((c) => c.status === "updating"));
@@ -56,19 +71,63 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
     return () => clearInterval(t);
   }, [working, refresh]);
 
+  const paste = (value: string) => {
+    setUrl(value);
+    setFrom(0);
+    setFound({ state: videoUrl(value) ? "looking" : "none" });
+  };
+
+  // A pasted link is looked at straight away (a moment after typing stops).
+  useEffect(() => {
+    const link = videoUrl(url);
+    if (!link) return;
+    const stop = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: link }), signal: stop.signal });
+        const j = await res.json().catch(() => ({}));
+        if (stop.signal.aborted) return;
+        if (j.ok) setFound({ state: "ok", title: j.title, uploader: j.uploader, seconds: j.seconds, live: j.live, thumb: j.thumb, place: j.place, planSeconds: j.planSeconds });
+        else if (res.ok && typeof j.problem === "string" && j.problem) setFound({ state: "bad", text: j.problem, again: j.again === true });
+        else setFound({ state: "unknown" });
+      } catch {
+        if (!stop.signal.aborted) setFound({ state: "unknown" });
+      }
+    }, 500);
+    return () => {
+      clearTimeout(t);
+      stop.abort();
+    };
+  }, [url, lookAgain]);
+
+  // A video longer than the plan takes at once: one stretch of it is clipped, and the member says where it starts.
+  const tooLong = found.state === "ok" && !found.live && found.planSeconds > 0 && found.seconds > found.planSeconds + 1;
+
   const start = async () => {
-    if (!url.trim() || sending) return;
+    if (!url.trim() || sending || found.state === "looking" || found.state === "bad") return;
     setSending(true);
     setProblem(null);
     try {
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), clips, maxLen, style, captions, tighten, layout, focus, look: style === "custom" ? look : null }),
+        body: JSON.stringify({
+          url: url.trim(),
+          clips,
+          maxLen,
+          style,
+          captions,
+          tighten,
+          layout,
+          focus,
+          look: style === "custom" ? look : null,
+          from: tooLong ? from : 0,
+          place: found.state === "ok" ? found.place : "",
+        }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return setProblem({ text: j.error || "Something went wrong. Please try again.", upgrade: j.upgrade, needsKey: j.needsKey });
-      setUrl("");
+      paste("");
       await refresh();
     } catch {
       setProblem({ text: "Couldn't reach the site. Check your connection and try again." });
@@ -86,6 +145,12 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
 
   const maxClips = Math.max(1, Math.min(account.clipsPerVideo, account.clipsLeft || 1));
   const needsKey = free && !hasKey;
+  const asked = Math.min(clips, maxClips);
+  // How many clips of the chosen length the video (or the stretch of it that is looked at) can hold.
+  const shortest = Math.round((maxLen * 2) / 3);
+  const looked = found.state === "ok" ? Math.min(found.seconds, found.planSeconds || found.seconds) : 0;
+  const room = found.state === "ok" && looked > 0 ? Math.max(1, Math.floor(looked / shortest)) : asked;
+  const spaceLeft = account.storage - account.used;
   const hint = LAYOUTS.find((l) => l.id === layout)?.hint;
 
   return (
@@ -103,12 +168,86 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           <label className="relative flex-1">
             <span className="sr-only">Video link</span>
             <Link2 className="pointer-events-none absolute start-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted" aria-hidden />
-            <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" autoCapitalize="none" spellCheck={false} className="field-native !h-12 ps-10" />
+            <input value={url} onChange={(e) => paste(e.target.value)} type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" autoCapitalize="none" spellCheck={false} className="field-native !h-12 ps-10" />
           </label>
-          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || account.clipsLeft <= 0}>
-            {sending ? "Starting…" : "Make clips"}
+          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || account.clipsLeft <= 0 || found.state === "looking" || found.state === "bad"}>
+            {sending ? "Starting…" : found.state === "looking" ? "Checking the link…" : "Make clips"}
           </Button>
         </form>
+
+        {found.state === "bad" && (
+          <Note tone="danger">
+            {found.text}{" "}
+            {found.again && (
+              <button type="button" className="font-medium underline underline-offset-4" onClick={() => {
+                  setFound({ state: "looking" });
+                  setLookAgain((n) => n + 1);
+                }}
+              >
+                Check again
+              </button>
+            )}
+          </Note>
+        )}
+        {found.state === "ok" && (
+          <div className="mt-3 rounded-xl bg-subtle p-3">
+            <div className="flex items-center gap-3">
+              {found.thumb && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={found.thumb} alt="" className="h-[54px] w-24 shrink-0 rounded-lg object-cover" />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-[14.5px] font-medium">{found.title}</p>
+                <p className="mt-0.5 truncate text-[13px] text-muted">
+                  {[found.uploader, found.live ? `Live now, ${howLong(found.seconds)} so far` : found.seconds ? howLong(found.seconds) : ""].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </div>
+            {found.live && found.seconds > found.planSeconds && (
+              <p className="mt-2.5 text-[13.5px] leading-snug text-ink-2">
+                The clips will come from its last {hoursWord(found.planSeconds / 3600)}, the most your plan takes at once.
+              </p>
+            )}
+            {tooLong && (
+              <div className="mt-2.5">
+                <p className="text-[13.5px] leading-snug text-ink-2">
+                  Your plan takes {hoursWord(found.planSeconds / 3600)} of a video at a time, and this one is longer. Choose which {hoursWord(found.planSeconds / 3600)} to clip:
+                </p>
+                <input
+                  type="range"
+                  min={0}
+                  max={found.seconds - found.planSeconds}
+                  step={60}
+                  value={from}
+                  onChange={(e) => setFrom(Number(e.target.value))}
+                  aria-label="Where the clipped part starts"
+                  className="mt-2 w-full accent-[var(--violet)]"
+                />
+                <p className="mt-1 text-[13.5px] tabular-nums">
+                  From <span className="font-semibold">{moment(from)}</span> to <span className="font-semibold">{moment(from + found.planSeconds)}</span>
+                  {account.plan !== "pro" && (
+                    <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
+                      Take more at once
+                    </Link>
+                  )}
+                </p>
+              </div>
+            )}
+            {room < asked && (
+              <p className="mt-2.5 text-[13.5px] leading-snug text-ink-2">
+                {found.seconds < shortest
+                  ? `It is only ${howLong(found.seconds)} long, so it will give one short clip.`
+                  : `At ${howLong(looked)} it has room for ${room === 1 ? "one clip" : `${room} clips`} of this length, not ${asked}. Pick a shorter clip length for more.`}
+              </p>
+            )}
+          </div>
+        )}
+        {spaceLeft > 0 && spaceLeft < asked * CLIP_BYTES && (
+          <Note tone="warn">
+            You have {formatBytes(spaceLeft)} of storage left, which may not hold {asked === 1 ? "this clip" : `all ${asked} clips`}. Delete clips you no longer need first
+            {free ? ", or pick a plan for more room." : ", or add storage."}
+          </Note>
+        )}
 
         <div className="mt-6 grid gap-x-8 gap-y-4 md:grid-cols-2">
           <Choice label="How many clips">

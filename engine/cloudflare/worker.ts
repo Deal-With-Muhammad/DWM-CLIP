@@ -75,18 +75,29 @@ export class ClipEngine extends DurableObject<Env> {
   }
 }
 
+// Parts of the world a container can be asked to start in (Durable Object location hints). A container starts
+// near whoever asked, and YouTube turns away the addresses of some places, so a refused video is handed to another.
+const PLACES = ["wnam", "enam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc"] as const;
+const placeOf = (v: unknown) => (PLACES as readonly string[]).includes(String(v)) ? (String(v) as DurableObjectLocationHint) : undefined;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/jobs") return new Response("Not found", { status: 404 });
-    // Only the website may start a container (they cost money): the same shared secret the container checks again.
+    if (request.method !== "POST" || (url.pathname !== "/jobs" && url.pathname !== "/check")) return new Response("Not found", { status: 404 });
+    // Only the website (and a container handing its job on) may start a container: they cost money. The same
+    // shared secret the container checks again.
     if (!env.ENGINE_SECRET || request.headers.get("authorization") !== `Bearer ${env.ENGINE_SECRET}`) return new Response("Unauthorized", { status: 401 });
-    const body = await request.text();
-    let id = "";
+    let job: { id?: unknown; place?: unknown } & Record<string, unknown> = {};
     try {
-      id = String((JSON.parse(body) as { id?: unknown }).id ?? "");
+      job = JSON.parse(await request.text());
     } catch {}
+    const id = String(job.id ?? "");
     if (!/^[\w-]{8,64}$/.test(id)) return new Response("Bad job", { status: 400 });
-    return env.ENGINE.getByName(id).fetch(new Request(request.url, { method: "POST", headers: request.headers, body }));
+    const place = placeOf(job.place);
+    // A job sent to a named place gets a container of its own there: a hint only counts the first time a name is used.
+    const engine = env.ENGINE.get(env.ENGINE.idFromName(place ? `${id}:${place}` : id), place ? { locationHint: place } : undefined);
+    // `engine` is this Worker's own address, which a container needs to hand its job to another place.
+    const body = JSON.stringify(url.pathname === "/jobs" ? { ...job, engine: url.origin } : job);
+    return engine.fetch(new Request(request.url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.ENGINE_SECRET}` }, body }));
   },
 };

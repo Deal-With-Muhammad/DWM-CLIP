@@ -141,19 +141,21 @@ class YouTubeLive(Stream):
         first, last = int(max(0.0, a) // self.step), int(max(0.0, b - 0.01) // self.step)
         return [update_url_query(fmt["url"], {"sq": str(n)}) for n in range(first, last + 1)]
 
-    def _fetch(self, pick, a, b, out, on_progress=None):
+    sound_at_once = 8       # pieces of sound fetched at the same time
+
+    def _fetch(self, pick, a, b, out, on_progress=None, threads=8):
         try:
-            return _save(self.ydl, self._pieces(pick(), a, b), out, on_progress)
+            return _save(self.ydl, self._pieces(pick(), a, b), out, on_progress, threads)
         except Exception:  # noqa: BLE001 - the addresses run out after a few hours: ask for fresh ones once
             self._load()
-            return _save(self.ydl, self._pieces(pick(), a, b), out, on_progress)
+            return _save(self.ydl, self._pieces(pick(), a, b), out, on_progress, threads)
 
     def _video_format(self, height):
         fits = [f for f in self.picture if (f.get("height") or 0) <= height] or self.picture
         return max(fits, key=lambda f: ((f.get("height") or 0), str(f.get("vcodec") or "").startswith("avc1"), f.get("tbr") or 0))
 
     def audio(self, a, b, out_dir: Path, stem: str, on_progress=None) -> Path:
-        raw = self._fetch(lambda: self.sound[0], a, b, Path(out_dir) / f"{stem}.pieces", on_progress)    # the smallest: it is only listened to
+        raw = self._fetch(lambda: self.sound[0], a, b, Path(out_dir) / f"{stem}.pieces", on_progress, self.sound_at_once)    # the smallest: it is only listened to
         out = Path(out_dir) / f"{stem}.m4a"
         _ffmpeg(["-i", str(raw), "-vn", "-c:a", "copy", str(out)])
         raw.unlink(missing_ok=True)
@@ -169,6 +171,47 @@ class YouTubeLive(Stream):
         v.unlink(missing_ok=True)
         s.unlink(missing_ok=True)
         return _cut_exact(whole, out, a - self.align(a), b - a) if exact else out
+
+
+class YouTubeEnded(YouTubeLive):
+    """For some hours after a YouTube stream ends, its recording is still handed out as the numbered pieces it
+    was broadcast in, and the usual way of fetching one part of a video fails on it. The pieces are all listed,
+    so any stretch is fetched by number, the same as while it was on air."""
+
+    # From Cloudflare each piece of a recording arrives at about the speed it plays, however small it is, so
+    # hours of sound take many minutes eight at a time. The pieces are tiny: three times as many are asked for at once.
+    sound_at_once = 24
+
+    def __init__(self, url, media, info=None):
+        self.url, self._media = url, media
+        self._load(info)
+
+    def _load(self, info=None):
+        if info is None:
+            with self._media._youtube_guard(self.url):
+                info = self._media._ydl({}).extract_info(self.url, download=False)
+        self.ydl = self._media._ydl({})
+        fm = [f for f in info.get("formats") or [] if "dash_segments" in str(f.get("protocol") or "") and len(f.get("fragments") or []) > 1
+              and all(x.get("url") for x in f["fragments"][:2])]
+        self.sound = sorted((f for f in fm if f.get("vcodec") in (None, "none")), key=lambda f: f.get("abr") or f.get("tbr") or 0)
+        self.picture = [f for f in fm if f.get("vcodec") not in (None, "none")]
+        self._len = float(info.get("duration") or 0)
+        if not self.sound or not self.picture or self._len <= 0:
+            raise NoRecording("This recording isn't in numbered pieces.")
+        self.count = len(self.sound[0]["fragments"])
+        self.step = float(self.sound[0].get("target_duration") or 0) or self._len / self.count
+        self._len = min(self._len, self.count * self.step)
+        self.title = _name(info.get("title")) if info.get("was_live") else str(info.get("title") or "")
+        self.uploader = info.get("uploader") or info.get("channel") or ""
+        self.thumbnail = info.get("thumbnail") or ""
+
+    def length(self) -> float:
+        return self._len
+
+    def _pieces(self, fmt, a, b) -> list:
+        parts = fmt["fragments"]
+        first, last = int(max(0.0, a) // self.step), min(len(parts) - 1, int(max(0.0, b - 0.01) // self.step))
+        return [x["url"] for x in parts[first:last + 1]]
 
 
 # ------------------------------------------------------------------------------------------- Twitch and Kick
@@ -290,6 +333,62 @@ def open_live(url: str, media):
     if media.is_youtube(url):
         return YouTubeLive(url, media)
     return None
+
+
+class Whole(Stream):
+    """An ordinary video (not in numbered pieces). Its sound is fetched whole and the wanted stretch cut from it,
+    which is quick: sound is small. The picture is only ever fetched for the clips themselves."""
+
+    def __init__(self, url, media, info):
+        self.url = url
+        self.title, self.uploader, self.thumbnail = info.get("title") or "", info.get("uploader") or info.get("channel") or "", info.get("thumbnail") or ""
+        self._len = float(info.get("duration") or 0)
+        self._audio, self._section = media.download_audio, media.download_section      # as they were, before use() replaces them
+
+    def length(self) -> float:
+        return self._len
+
+    def align(self, t: float) -> float:
+        return max(0.0, float(t))
+
+    def audio(self, a, b, out_dir: Path, stem: str, on_progress=None) -> Path:
+        out_dir = Path(out_dir)
+        whole = self._audio(self.url, out_dir, on_progress)
+        out = out_dir / f"{stem}.cut.m4a"
+        _ffmpeg(["-ss", f"{a:.3f}", "-i", str(whole), "-t", f"{b - a:.3f}", "-vn", "-c:a", "aac", "-b:a", "96k", str(out)])
+        whole.unlink(missing_ok=True)
+        return out
+
+    def video(self, a, b, out_dir: Path, stem: str, height=720, exact=False) -> Path:
+        return self._section(self.url, Path(out_dir), stem, a, b, height, exact)
+
+
+def look(url: str, media):
+    """What media.info() says about a link, and everything the site answered (which tells how it can be fetched)."""
+    with media._youtube_guard(url), media._ydl({}) as ydl:
+        i = ydl.extract_info(url, download=False)
+    return ({"title": i.get("title") or "", "uploader": i.get("uploader") or i.get("channel") or "", "duration": float(i.get("duration") or 0),
+             "is_live": bool(i.get("is_live")), "thumbnail": i.get("thumbnail") or "", "kind": i.get("_type") or "video"}, i)
+
+
+def open_recording(url: str, media, info: dict, part=False):
+    """A video that has ended, as something a stretch can be fetched from. A YouTube stream still in its numbered
+    pieces always needs this. Any other video needs it only when just a `part` of it is wanted: a Twitch or Kick
+    recording is a list of short files, and an ordinary video has its sound fetched whole."""
+    if media.is_youtube(url) and any("dash_segments" in str(f.get("protocol") or "") for f in info.get("formats") or []):
+        try:
+            return YouTubeEnded(url, media, info)
+        except NoRecording:
+            pass
+    if not part:
+        return None
+    fm = [f for f in info.get("formats") or [] if f.get("url") and "m3u8" in str(f.get("protocol") or "")]
+    sizes = [(int(f["height"]), f["url"]) for f in fm if f.get("height") and f.get("vcodec") not in (None, "none")]
+    if sizes and not media.is_youtube(url):
+        sound = next((f["url"] for f in fm if f.get("vcodec") in (None, "none")), None)
+        return HlsRecording(media._ydl({}), sizes, sound, info.get("title") or "", info.get("uploader") or "", info.get("thumbnail") or "",
+                            info.get("webpage_url") or url)
+    return Whole(url, media, info)
 
 
 def use(media, stream, base=0.0, span=None):

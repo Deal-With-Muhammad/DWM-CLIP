@@ -2,6 +2,7 @@
 
   GET  /health            is it up, and how many jobs are running
   POST /jobs              start a job (Authorization: Bearer ENGINE_SECRET), body described in runner.py
+  POST /check             look at a link without making anything: {"url": ...} -> its name and length, or why not
 
 Settings: ENGINE_SECRET (required), PORT (8080), ENGINE_MAX_JOBS (2), ENGINE_ONE_SHOT=1 to exit when the
 last job finishes (used on Cloudflare, where one container is started per job and stops when it is done).
@@ -25,6 +26,7 @@ ONE_SHOT = os.environ.get("ENGINE_ONE_SHOT") == "1"
 _running: dict = {}
 _lock = threading.Lock()
 _started = time.time()
+_checks = [0, 0]        # links being looked at now, and looked at so far
 
 
 def _alive() -> int:
@@ -48,12 +50,38 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "running": _alive()})
         self._send(404, {"error": "not found"})
 
+    def _check(self):
+        """A link looked at before anything is made from it. Answered here, in the same request."""
+        try:
+            url = json.loads(self.rfile.read(min(int(self.headers.get("content-length", "0")), 10_000))).get("url")
+            if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
+                raise ValueError("url")
+        except (ValueError, TypeError, AttributeError):
+            return self._send(400, {"error": "bad link"})
+        with _lock:
+            _checks[0] += 1
+        try:
+            p = subprocess.run([sys.executable, str(HERE / "runner.py"), "--check", url], cwd=str(HERE), capture_output=True, text=True, timeout=75)
+            line = next((l for l in reversed(p.stdout.splitlines()) if l.startswith("CHECK ")), None)
+            if not line:
+                print(p.stderr[-2000:], flush=True)
+            out = json.loads(line[6:]) if line else {"ok": False, "error": ""}
+        except subprocess.TimeoutExpired:
+            out = {"ok": False, "error": "", "slow": True}
+        finally:
+            with _lock:
+                _checks[0] -= 1
+                _checks[1] += 1
+        self._send(200, out)
+
     def do_POST(self):
-        if self.path != "/jobs":
+        if self.path not in ("/jobs", "/check"):
             return self._send(404, {"error": "not found"})
         given = self.headers.get("authorization", "")
         if not SECRET or not hmac.compare_digest(given, "Bearer " + SECRET):
             return self._send(401, {"error": "unauthorized"})
+        if self.path == "/check":
+            return self._check()
         try:
             spec = json.loads(self.rfile.read(min(int(self.headers.get("content-length", "0")), 1_000_000)))
             for k in ("id", "url", "callback", "token"):   # an edit also carries "job" and "clip"; the runner checks those
@@ -76,12 +104,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _stop_when_idle(server):
-    """One container per job: once it has had a job and none is left, stop, so nothing is billed for idling."""
+    """One container per job: once it has had a job (or looked at a link) and nothing is left, stop, so nothing
+    is billed for idling."""
     had = False
     while True:
         time.sleep(5)
-        n = _alive()
-        had = had or n > 0
+        n = _alive() + _checks[0]
+        had = had or n > 0 or _checks[1] > 0
         if (had and n == 0) or (not had and time.time() - _started > 600):
             server.shutdown()
             return
