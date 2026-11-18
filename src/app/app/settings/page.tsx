@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { FREE, LITE, PRO, STORAGE_PACK, formatBytes, type Plan } from "@/lib/plans";
+import { FREE, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { checkoutConfig, paymentsEnabled, portalUrl, provider, type Kind } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
@@ -14,14 +14,6 @@ import { KeyForm } from "./key-form";
 import { PayButton } from "./pay-button";
 
 export const metadata = { title: "Settings", robots: { index: false, follow: false } };
-
-const rows = (p: Plan) => [
-  p.id === "free" ? "Clip until your storage is full" : `${p.clips} clips every month`,
-  p.ourAi ? "Our AI, no key needed" : "Your own AI key",
-  `${formatBytes(p.storage)} of storage`,
-  `Videos up to ${p.maxHours} hour${p.maxHours === 1 ? "" : "s"}`,
-  ...(p.id === "pro" ? [`${p.clipsPerVideo} clips from one video`, "Two videos at once"] : []),
-];
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await currentUser();
@@ -65,9 +57,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-[20px]">Your plan: {account.planName}</h2>
             <p className="text-[14px] text-muted">
-              {paid ? `${account.clipsLeft} of ${account.clips} clips left this month` : `${account.clipsMade} clip${account.clipsMade === 1 ? "" : "s"} made this month`} · {formatBytes(account.used)} of {formatBytes(account.storage)} used
+              {account.clipsMade} clip{account.clipsMade === 1 ? "" : "s"} made this month · {formatBytes(account.used)} of {formatBytes(account.storage)} used
             </p>
           </div>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-muted">
+            Every plan clips with your own AI key, so there is no charge for the AI here. A plan pays for room to keep your clips, more clips from each video, and more of a long video at a time.
+          </p>
           {account.planEnds && paid && <p className="mt-2 text-[14px] text-warn-ink">Your plan is cancelled and stays on until {day(account.planEnds)}.</p>}
           {account.paysForBoth && (
             <p className="mt-2 rounded-xl bg-warn-soft px-3.5 py-2.5 text-[14px] text-warn-ink">You&apos;re on Pro and still paying for Lite. Cancel Lite with &quot;Manage or cancel&quot; below so you aren&apos;t charged for both.</p>
@@ -88,7 +83,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     {p.price > 0 && <span className="text-[14px] font-normal text-muted"> /month</span>}
                   </p>
                   <ul className="mt-3.5 flex-1 space-y-1.5 text-[13.5px] text-ink-2">
-                    {rows(p).map((r) => (
+                    {planRows(p).map((r) => (
                       <li key={r} className="flex gap-2">
                         <Check className="mt-[3px] size-[15px] shrink-0 text-brand" aria-hidden />
                         {r}
@@ -115,9 +110,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <section id="ai" className="card mt-4 scroll-mt-20 p-5 sm:p-6">
           <h2 className="font-display text-[20px]">Your AI key</h2>
           <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted">
-            {account.ourAi
-              ? `${account.planName} uses our AI, so you don't need this. A key saved here is only used if you go back to the free plan.`
-              : "On the free plan, the AI that picks the best moments runs on your own key. Pick any service below; some of them give keys away for free."}
+            The AI that picks the best moments and writes the titles runs on your own key, on every plan. Pick any service below; some of them give keys away for free.
           </p>
           <KeyForm saved={key} />
         </section>

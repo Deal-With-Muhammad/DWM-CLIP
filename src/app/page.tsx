@@ -5,7 +5,7 @@ import { HeroVideo } from "@/components/hero-video";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
-import { FREE, LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
+import { FREE, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -24,7 +24,7 @@ const FEATURES = [
 const FAQ = [
   {
     q: "Do I need an AI key?",
-    a: "Not on Lite or Pro: our AI picks the moments. On the free plan it runs on your own key from any of the big AI services, and several of them give keys away for free.",
+    a: "Yes, on every plan. The AI that picks the moments runs on your own key from any of the big AI services, and several of them give keys away for free, so the AI costs you nothing here. A plan pays for storage, more clips from each video and longer videos.",
   },
   {
     q: "Which videos can I clip?",
@@ -45,20 +45,20 @@ const FAQ = [
 export default async function Home() {
   const user = await currentUser().catch(() => null);
   const plans = [
-    { plan: FREE, line: "Try it with your own AI key", cta: "Start free", href: "/signup", rows: ["Clip until your storage is full", "Bring your own AI key", `${formatBytes(FREE.storage)} of storage, about 8 clips`, `Videos up to ${FREE.maxHours} hour`, "Edit your clips"] },
+    { plan: FREE, line: "For trying it out", cta: "Start free", href: "/signup", rows: planRows(FREE) },
     {
       plan: LITE,
       line: "For posting a few times a week",
       cta: "Get Lite",
       href: "/app/settings#plan",
-      rows: [`${LITE.clips} clips every month`, "Our AI, no key needed", `${formatBytes(LITE.storage)} of storage`, `Videos up to ${LITE.maxHours} hours`, "Sharper 1080p source", "Edit your clips"],
+      rows: planRows(LITE),
     },
     {
       plan: PRO,
       line: "For clipping every day",
       cta: "Get Pro",
       href: "/app/settings#plan",
-      rows: [`${PRO.clips} clips every month`, "Our AI, no key needed", `${formatBytes(PRO.storage)} of storage`, `Videos up to ${PRO.maxHours} hours`, `${PRO.clipsPerVideo} clips from one video`, "Two videos at once", "Edit your clips"],
+      rows: planRows(PRO),
     },
   ];
   return (
@@ -106,7 +106,7 @@ export default async function Home() {
               <div className="mt-7">
                 <TryBox />
                 <p className="mt-3 text-[13.5px] text-white/65">
-                  Free with your own AI key, no card. Plans from ${LITE.price} a month.
+                  Free with your own AI key, no card. More storage from ${LITE.price} a month.
                 </p>
               </div>
               <p className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-white/65">
@@ -185,7 +185,7 @@ export default async function Home() {
         <section id="pricing" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="font-display text-[32px]">Pricing</h2>
-            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">Start free. Pay when you want more clips and don&apos;t want to think about AI keys. Cancel any time.</p>
+            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">Start free. The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. Cancel any time.</p>
             <div className="mt-9 grid gap-4 md:grid-cols-3">
               {plans.map(({ plan, line, cta, href, rows }) => {
                 const best = plan.id === "pro";

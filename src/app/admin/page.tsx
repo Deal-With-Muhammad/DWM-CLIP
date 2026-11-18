@@ -7,7 +7,7 @@ import { accountOf } from "@/lib/server/account";
 import { all, first } from "@/lib/server/db";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
-import { setBonus, setPlan, testOurAi } from "./actions";
+import { setBonus, setPlan } from "./actions";
 import { DeleteClip } from "./delete-clip";
 import { When } from "./when";
 
@@ -39,17 +39,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const query = await searchParams;
   const asked = Math.max(1, Math.floor(Number(query.page)) || 1);
-  const aiTest = typeof query.ai === "string" ? query.ai.slice(0, 700) : "";
   const since = ago(DAYS);
   const week = ago(7);
   const now = ago(0);
   const [account, totals, subs, signups, clipDays, jobDays, users, jobs, events] = await Promise.all([
     accountOf(user),
-    first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; tokens: number; active7: number; done: number; aiOk: number }>(
+    first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; keys: number; active7: number; done: number; aiOk: number }>(
       `select (select count(*) from users) as users, (select count(*) from users where created_at > ?1) as users7,
         (select count(*) from jobs) as jobs, (select count(*) from jobs where status = 'error') as failed,
         (select coalesce(sum(clips), 0) from usage) as clips, (select coalesce(sum(bytes), 0) from clips) as bytes,
-        (select coalesce(sum(tokens), 0) from jobs where ai_mode = 'ours') as tokens,
+        (select count(*) from ai_keys) as keys,
         (select count(distinct user_id) from jobs where created_at > ?1) as active7,
         (select count(*) from jobs where status = 'done') as done, (select count(*) from jobs where status = 'done' and tokens > 0) as aiOk`,
       week,
@@ -107,29 +106,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Tile label="Active this week" value={t.active7} sub="members who clipped a video" />
           <Tile label="Clips made" value={t.clips} sub={`${t.jobs} video${t.jobs === 1 ? "" : "s"}, ${t.failed} failed`} />
           <Tile label="Storage in use" value={formatBytes(t.bytes)} sub={`about $${((t.bytes / 1024 ** 3) * 0.015).toFixed(2)}/month on R2`} />
-          <Tile label="Our AI tokens" value={t.tokens.toLocaleString("en-US")} sub="used for Lite and Pro members" />
+          <Tile label="Members with an AI key" value={`${t.keys} of ${t.users}`} sub="every plan clips with the member's own key" />
           <Tile label="AI picked the moments" value={`${t.aiOk} of ${t.done}`} sub="finished videos; the rest fell back to the loudest moments" />
-          <div id="ai" className="card scroll-mt-20 px-4 py-3.5">
-            <p className="text-[13px] text-muted">Our AI (Lite and Pro)</p>
-            <form action={testOurAi} className="mt-2">
-              <button className="rounded-lg bg-subtle px-2.5 py-1 text-[13.5px] hover:bg-line">Test it now</button>
-            </form>
-            <p className="mt-1.5 text-[12.5px] leading-snug text-muted">{aiTest ? "" : "Asks each model one tiny question."}</p>
-          </div>
         </section>
-
-        {aiTest && (
-          <div className="card mt-3 px-4 py-3.5 text-[13.5px]">
-            <p className="font-medium">Our AI, tested just now</p>
-            <ul className="mt-1.5 grid gap-1">
-              {aiTest.split(" | ").map((line) => (
-                <li key={line} className={/: works$/.test(line) ? "text-ink-2" : "text-danger"}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         <section className="mt-4 grid gap-3 lg:grid-cols-3">
           <Chart title="New members" days={fill(signups)} />
@@ -206,7 +185,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     {j.title || j.url}
                   </a>
                   <span className="text-muted">
-                    {j.email} · {j.ai_mode === "ours" ? "our AI" : "own key"} · <When iso={j.created_at} />
+                    {j.email} · <When iso={j.created_at} />
                   </span>
                 </div>
                 {j.error && <p className="mt-1 text-danger">{j.error}</p>}

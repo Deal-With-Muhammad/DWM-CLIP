@@ -1,5 +1,8 @@
 // What each plan gives. One place, used by the pages and by the server checks.
 // Prices are what Lemon Squeezy and Paddle charge; change them there too.
+//
+// Every plan picks the moments with the member's own AI key (since 2026-11-19 there is no AI of ours).
+// A plan pays for storage, more clips from one video, more of a long video at a time and a sharper picture.
 
 export const MB = 1024 * 1024;
 export const GB = 1024 * MB;
@@ -12,21 +15,20 @@ export type Plan = {
   /** US dollars a month. */
   price: number;
   storage: number;
-  /** Clips per calendar month. On Free the member's storage is the real limit; this is only a ceiling
-   *  nobody clipping by hand reaches, so one account can't run the engine all month at our cost. */
+  /** Clips per calendar month. The member's storage is the real limit on every plan; this is only a
+   *  ceiling nobody clipping by hand reaches, so one account can't run the engine all month at our cost
+   *  (a clip costs us about a cent to make). */
   clips: number;
   clipsPerVideo: number;
   maxHours: number;
   jobsAtOnce: number;
   /** The tallest picture fetched from the video. Clips are always 1080x1920. */
   quality: number;
-  /** Uses our AI, so the member needs no key of their own. */
-  ourAi: boolean;
 };
 
-export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720, ourAi: false };
-export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 20, clipsPerVideo: 5, maxHours: 2, jobsAtOnce: 1, quality: 1080, ourAi: true };
-export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 150, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, ourAi: true };
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720 };
+export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 120, clipsPerVideo: 5, maxHours: 2, jobsAtOnce: 1, quality: 1080 };
+export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080 };
 
 export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
 
@@ -63,6 +65,27 @@ export const PROVIDERS = [
   { id: "xai", label: "Grok (xAI)", model: "grok-4", models: ["grok-4"], keyUrl: "https://console.x.ai", free: false },
   { id: "anthropic", label: "Claude", model: "claude-haiku-5-5", models: ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"], keyUrl: "https://console.anthropic.com", free: false },
 ] as const;
+
+/** Roughly what one finished clip takes up. */
+export const CLIP_BYTES = 25 * MB;
+
+/** "about 8 clips": how many clips a plan's storage holds, rounded the way people say it. */
+export function roomFor(bytes: number) {
+  const n = bytes / CLIP_BYTES;
+  return `about ${n >= 100 ? Math.round(n / 50) * 50 : n >= 20 ? Math.round(n / 10) * 10 : Math.round(n)} clips`;
+}
+
+/** What a plan gives, one line each, for the plan cards. */
+export function planRows(p: Plan) {
+  return [
+    `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,
+    `${p.clipsPerVideo} clips from one video`,
+    `${p.maxHours === 1 ? "1 hour" : `${p.maxHours} hours`} of a video at a time`,
+    ...(p.quality >= 1080 ? ["Sharper 1080p source"] : []),
+    ...(p.jobsAtOnce > 1 ? ["Two videos at once"] : []),
+    ...(p.id === "free" ? [] : ["Add 10 GB more whenever you need it"]),
+  ];
+}
 
 export function formatBytes(n: number) {
   if (n >= GB) return `${(n / GB).toFixed(n >= 10 * GB ? 0 : 1).replace(/\.0$/, "")} GB`;

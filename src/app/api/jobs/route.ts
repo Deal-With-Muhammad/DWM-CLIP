@@ -13,7 +13,6 @@ import { fail, siteOrigin } from "@/lib/server/http";
 import { keyFor } from "@/lib/server/keys";
 import { listJobs } from "@/lib/server/library";
 import { currentUser } from "@/lib/server/session";
-import { setting } from "@/lib/server/settings";
 
 // GET: the member's videos and clips, plus what they have left. The page asks every few seconds while a video is being worked on.
 export async function GET() {
@@ -29,7 +28,7 @@ const between = (v: unknown, lo: number, hi: number, fallback: number) => (typeo
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
-  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown; from?: unknown; place?: unknown };
+  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; focus?: unknown; look?: unknown; from?: unknown; place?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -41,28 +40,19 @@ export async function POST(req: Request) {
 
   const account = await accountOf(user);
   if (account.clipsLeft <= 0) {
-    return fail(402, account.plan === "free" ? "You've reached the free plan's limit for this month. It resets on the 1st, or pick a plan to keep going." : "You've used this month's clips. They reset on the 1st.", { upgrade: account.plan !== "pro" });
+    return fail(402, "You've made the most clips this plan allows in a month. It resets on the 1st.", { upgrade: account.plan !== "pro" });
   }
   if (account.used >= account.storage) return fail(402, account.plan === "free" ? "Your storage is full. Delete some clips to make room, or pick a plan for more." : "Your storage is full. Delete some clips or add storage.", { upgrade: true });
   const running = await first<{ n: number }>("select count(*) as n from jobs where user_id = ? and status in ('queued', 'running')", user.id);
   if ((running?.n ?? 0) >= account.jobsAtOnce) return fail(409, account.jobsAtOnce === 1 ? "One video at a time on this plan. Wait for this one to finish." : "Two videos are already being clipped. Wait for one to finish.");
 
-  // Whose AI picks the moments: ours on a paid plan (unless they'd rather use their own key), the member's own on the free plan.
-  const own = await keyFor(user.id);
-  const useOwn = !account.ourAi || (body.ownKey === true && Boolean(own));
-  let ai: { provider: string; model: string; key: string } | null;
-  if (useOwn) {
-    if (!own) return fail(400, "Add your AI key first, or pick a plan and skip it.", { needsKey: true });
-    ai = own;
-  } else {
-    const key = setting("AI_KEY");
-    if (!key) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
-    ai = { provider: setting("AI_PROVIDER") || "gemini", model: setting("AI_MODEL") || "gemini-2.5-flash-lite", key };
-  }
+  // The moments are picked with the member's own AI key, on every plan.
+  let ai = await keyFor(user.id);
+  if (!ai) return fail(400, "Add your AI key first. Several services give one away for free.", { needsKey: true });
   // A member's own Gemini key: a retired model is swapped for the one Google replaced it with, and the other
   // current models are kept as further tries. A free key has a separate small allowance for each model, so one
   // model that has run out doesn't leave the clips without the AI.
-  if (useOwn && ai.provider === "gemini") {
+  if (ai.provider === "gemini") {
     ai = { ...ai, model: [...new Set([RETIRED_MODELS[ai.model], ai.model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"].filter(Boolean))].join(",") };
   }
   if (!engineReady()) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
@@ -93,7 +83,7 @@ export async function POST(req: Request) {
     url,
     JSON.stringify(options),
     focus,
-    useOwn ? "own" : "ours",
+    "own",
     ai.model,
     at,
     at,

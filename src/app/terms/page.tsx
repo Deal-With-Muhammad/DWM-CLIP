@@ -21,7 +21,7 @@ export default function Terms() {
       <section>
         <h2>Plans and limits</h2>
         <p>
-          Free: clips made with your own AI key, as many as fit in {formatBytes(FREE.storage)} of storage, up to {FREE.clips} a month. Lite: {LITE.clips} clips a month and {formatBytes(LITE.storage)} of storage. Pro: {PRO.clips} clips a month and {formatBytes(PRO.storage)} of storage. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
+          On every plan the clips are made with your own AI key, and you can keep as many as fit in your storage. Free: {formatBytes(FREE.storage)} of storage, {FREE.clipsPerVideo} clips from one video, up to {FREE.clips} clips a month. Lite: {formatBytes(LITE.storage)}, {LITE.clipsPerVideo} clips from one video, up to {LITE.clips} a month. Pro: {formatBytes(PRO.storage)}, {PRO.clipsPerVideo} clips from one video, up to {PRO.clips} a month. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
           already paid for.
         </p>
       </section>
@@ -34,7 +34,7 @@ export default function Terms() {
       </section>
       <section>
         <h2>Your AI key</h2>
-        <p>If you add your own AI key, you pay that service directly for what it uses. The key is used only to clip your videos.</p>
+        <p>Clips are made with an AI key you add yourself. If that service charges for what the key uses, you pay it directly. The key is used only to clip your videos.</p>
       </section>
       <section>
         <h2>No guarantee</h2>

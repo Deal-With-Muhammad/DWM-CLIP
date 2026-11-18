@@ -30,7 +30,7 @@ export type EngineJob = {
   url: string;
   callback: string;
   options: { max_clips: number; min_len: number; max_len: number; style: string; layout: string; captions: boolean; quality: number };
-  ai: { provider: string; model: string; key: string } | null;
+  ai: { provider: string; model: string; key: string };
   max_hours: number;
   /** What the member asked the AI to look for. */
   focus: string;

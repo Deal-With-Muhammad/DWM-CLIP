@@ -31,7 +31,6 @@ export type Account = {
   maxHours: number;
   jobsAtOnce: number;
   quality: number;
-  ourAi: boolean;
   storagePacks: number;
   /** Where a Lemon Squeezy subscriber manages or cancels (Paddle has one link for everyone). */
   portal: string | null;
@@ -69,7 +68,6 @@ export async function accountOf(user: User): Promise<Account> {
     maxHours: plan.maxHours,
     jobsAtOnce: plan.jobsAtOnce,
     quality: plan.quality,
-    ourAi: plan.ourAi,
     storagePacks: packs,
     portal: sub?.portal_url ?? active.find((s) => s.portal_url)?.portal_url ?? null,
     planEnds: sub?.ends_at ?? null,

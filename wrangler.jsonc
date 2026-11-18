@@ -18,9 +18,6 @@
     // fallback for a host without that binding.
     "SMTP_HOST": "smtp.gmail.com",
     "SMTP_FROM": "me@dealwithmuhammad.com",
-    // "Our AI" for Pro: the cheapest model that still picks good moments.
-    "AI_PROVIDER": "gemini",
-    "AI_MODEL": "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash",
     // Which service takes payments: "lemonsqueezy" now, "paddle" once Paddle has approved the site.
     "PAYMENTS": "lemonsqueezy",
     // Lemon Squeezy (store "DWM Invite"): each product's checkout link and id. Not secret.
@@ -42,7 +39,6 @@
   //   ADMIN_EMAILS                   who may open /admin (comma separated)
   //   SESSION_SECRET                 signs sign-in cookies and locks saved AI keys; any long random string
   //   SMTP_USER, SMTP_PASS           optional SMTP fallback (emails normally go through the EMAIL binding)
-  //   AI_KEY                         the Gemini key used for Pro members
   //   ENGINE_URL, ENGINE_SECRET      where the clip engine runs, and the password it shares with this site
   //   LEMONSQUEEZY_WEBHOOK_SECRET    the signing secret of the Lemon Squeezy webhook that points at
   //                                  https://clip.dealwithmuhammad.com/api/billing/lemonsqueezy

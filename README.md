@@ -20,8 +20,10 @@ The website starts a job on the engine (`ENGINE_URL`), and the engine sends prog
 
 ## Plans
 
-Set in `src/lib/plans.ts`. Free: 2 clips with the member's own AI key, 200 MB. Lite: $2/month, 20 clips, 1 GB.
-Pro: $9/month, 150 clips, 5 GB. Lite and Pro use our AI key, and can add 10 GB blocks at $2/month. Payments: Lemon Squeezy for now (`src/lib/server/lemonsqueezy.ts`, webhook `/api/billing/lemonsqueezy`), Paddle ready beside it (`src/lib/server/billing.ts`, webhook `/api/billing/webhook`). `PAYMENTS` in `wrangler.jsonc` picks which one the pay buttons use; `seller` in `src/lib/site.ts` is the name shown on the legal pages.
+Set in `src/lib/plans.ts`. Every plan picks the moments with the member's own AI key; a plan pays for storage,
+more clips from one video and more of a long video at a time. Free: 200 MB, 2 clips from one video, 1 hour at a time.
+Lite: $2/month, 1 GB, 5 clips, 2 hours. Pro: $9/month, 5 GB, 10 clips, 3 hours, two videos at once. Lite and Pro can add
+10 GB blocks at $2/month. Payments: Lemon Squeezy for now (`src/lib/server/lemonsqueezy.ts`, webhook `/api/billing/lemonsqueezy`), Paddle ready beside it (`src/lib/server/billing.ts`, webhook `/api/billing/webhook`). `PAYMENTS` in `wrangler.jsonc` picks which one the pay buttons use; `seller` in `src/lib/site.ts` is the name shown on the legal pages.
 
 ## Run it on this computer
 
@@ -44,7 +46,7 @@ npm run engine
 ```
 
 Settings for development live in `.dev.vars` (not committed): `SESSION_SECRET`, `ENGINE_SECRET`,
-`ENGINE_URL=http://127.0.0.1:8080`, `ADMIN_EMAILS`, `AI_KEY`. Sign-in codes are printed in the `npm run dev` output.
+`ENGINE_URL=http://127.0.0.1:8080`, `ADMIN_EMAILS`. Sign-in codes are printed in the `npm run dev` output.
 
 ## Deploy
 
@@ -53,7 +55,7 @@ npm run cf:deploy
 ```
 
 Secrets on the `dwm-clip` Worker (`npx wrangler secret put NAME`): `SESSION_SECRET`, `ENGINE_SECRET`, `ENGINE_URL`,
-`SMTP_USER`, `SMTP_PASS`, `AI_KEY`, `ADMIN_EMAILS`, `LEMONSQUEEZY_WEBHOOK_SECRET`, and the `PADDLE_*` values listed in `wrangler.jsonc`.
+`SMTP_USER`, `SMTP_PASS`, `ADMIN_EMAILS`, `LEMONSQUEEZY_WEBHOOK_SECRET`, and the `PADDLE_*` values listed in `wrangler.jsonc`.
 
 The engine: `cd engine/cloudflare && npx wrangler deploy` (Workers Paid plan, Docker running), then
 `npx wrangler secret put ENGINE_SECRET` there with the same value as the website.

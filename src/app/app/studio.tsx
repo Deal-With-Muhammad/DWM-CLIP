@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { LAYOUTS, MB, formatBytes } from "@/lib/plans";
+import { CLIP_BYTES, LAYOUTS, formatBytes } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -22,9 +22,6 @@ type Found =
   | { state: "none" | "looking" | "unknown" }
   | { state: "bad"; text: string; again: boolean }
   | { state: "ok"; title: string; uploader: string; seconds: number; live: boolean; thumb: string; place: string; planSeconds: number };
-
-// Roughly what one finished clip takes up, for saying when the storage left won't hold the clips asked for.
-const CLIP_BYTES = 25 * MB;
 
 const busy = (j: Job) => j.status === "queued" || j.status === "running";
 
@@ -144,7 +141,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   };
 
   const maxClips = Math.max(1, Math.min(account.clipsPerVideo, account.clipsLeft || 1));
-  const needsKey = free && !hasKey;
+  const needsKey = !hasKey;
   const asked = Math.min(clips, maxClips);
   // How many clips of the chosen length the video (or the stretch of it that is looked at) can hold.
   const shortest = Math.round((maxLen * 2) / 3);
@@ -315,15 +312,11 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
 
         {needsKey && (
           <Note tone="warn">
-            The free plan uses your own AI key to pick the moments.{" "}
+            The AI that picks the moments runs on your own key, and several services give one away for free.{" "}
             <Link href="/app/settings#ai" className="font-medium underline underline-offset-4">
               Add your key
-            </Link>
-            , or{" "}
-            <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
-              pick a plan from $2
             </Link>{" "}
-            and skip it.
+            to start.
           </Note>
         )}
         {problem && (
@@ -343,7 +336,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
         )}
         {!problem && !needsKey && account.clipsLeft <= 0 && (
           <Note tone="warn">
-            {free ? "You've reached the free plan's limit for this month. It resets on the 1st." : "You've used this month's clips. They reset on the 1st."}{" "}
+            You&apos;ve made the most clips this plan allows in a month. It resets on the 1st.{" "}
             {account.plan !== "pro" && (
               <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
                 {free ? "Pick a plan from $2" : "Move up to Pro"}
@@ -455,30 +448,18 @@ function Note({ tone, children }: { tone: "warn" | "danger"; children: React.Rea
 
 /** Clips left and storage used, with the way to get more. */
 function Meters({ account }: { account: Account }) {
-  const free = account.plan === "free";
   const full = account.used / account.storage;
   return (
     <section className="mt-4 grid gap-3 sm:grid-cols-2">
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[13.5px] text-muted">Clips this month</p>
-          {free ? (
-            <p className="text-[13.5px] tabular-nums">
-              <span className="font-semibold">{account.clipsMade}</span> made
-            </p>
-          ) : (
-            <p className="text-[13.5px] tabular-nums">
-              <span className="font-semibold">{account.clipsLeft}</span> of {account.clips} left
-              {account.plan !== "pro" && (
-                <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
-                  Get more
-                </Link>
-              )}
-            </p>
-          )}
+          <p className="text-[13.5px] tabular-nums">
+            <span className="font-semibold">{account.clipsMade}</span> made
+          </p>
         </div>
-        {/* On Free there is no count to run out of: the storage beside this is the limit. */}
-        {free ? <p className="mt-2 text-[12.5px] leading-snug text-muted">Your storage is the limit. Delete clips to make room for new ones.</p> : <Bar value={account.clipsMade / account.clips} />}
+        {/* There is no count to run out of: the storage beside this is the limit. */}
+        <p className="mt-2 text-[12.5px] leading-snug text-muted">Your storage is the limit. Delete clips to make room for new ones.</p>
       </div>
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
