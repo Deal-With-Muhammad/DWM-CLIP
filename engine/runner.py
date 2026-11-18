@@ -8,6 +8,7 @@ This file starts it for one job, sends progress to the website, and uploads each
 Run as:  python runner.py <job.json>      (server.py does this; the file is deleted as soon as it is read)
 """
 import base64
+import gzip
 import json
 import os
 import re
@@ -60,6 +61,47 @@ def use_look(render, look) -> bool:
 
         render.geometry = placed
     return True
+
+
+def sign_in(media) -> bool:
+    """Lets the engine fetch from YouTube as a signed-in account, when one has been set up (YT_COOKIES).
+
+    YouTube only hands over age-restricted videos, and sometimes any video ("confirm you're not a bot"), to a
+    signed-in visitor. The cookies of a YouTube account are kept as a secret on the engine's Worker (see
+    set-youtube-cookies.sh); here they are written to a file for this one job and given to every download."""
+    raw = os.environ.get("YT_COOKIES", "").strip()
+    if not raw:
+        return False
+    try:
+        text = gzip.decompress(base64.b64decode(raw)).decode("utf-8")
+    except Exception:  # noqa: BLE001 - not packed: taken as the cookie file's own text
+        text = raw
+    if "youtube.com" not in text:
+        return False
+    if not text.startswith("# Netscape"):
+        text = "# Netscape HTTP Cookie File\n" + text
+    path = Path(tempfile.mkdtemp(prefix="yt-")) / "cookies.txt"
+    path.write_text(text, encoding="utf-8")
+    plain = media._ydl
+    media._ydl = lambda opts: plain({"cookiefile": str(path), **opts})
+    return True
+
+
+def explain(e, signed_in=False):
+    """What went wrong, said the way a member can act on. None when the engine's own wording will do."""
+    s = str(e)
+    if re.search(r"confirm your age|age.restricted|inappropriate for some users", s, re.I):
+        return ("This video is age-restricted on YouTube and our YouTube sign-in needs renewing. Please try again later." if signed_in
+                else "This video is age-restricted on YouTube, so it can't be clipped yet. Try a different video.")
+    if re.search(r"not a bot|confirm you.?re not|isn't letting .* download", s, re.I):
+        return "YouTube refused to give this video to our server just now. Try again in a few minutes, or use a Twitch or Kick link."
+    if re.search(r"is a live stream|live event will begin|Premieres in|is offline", s, re.I):
+        return "This stream is still live, or hasn't started. Paste the link again once it has ended."
+    if re.search(r"Private video|members.only|Join this channel|Video unavailable|has been removed|not available in your country", s, re.I):
+        return "This video is private, members-only, removed or blocked in some countries, so it can't be fetched."
+    if re.search(r"\b403\b|Forbidden", s):
+        return "The video site refused the download. Please try again in a few minutes."
+    return None
 
 
 def main(spec_path: str):
@@ -132,6 +174,7 @@ def make(spec, web, work):
         uid = user["id"] if isinstance(user, dict) else getattr(user, "id", auth.LOCAL_ID)
         ctx.set_uid(uid)
         render.install_fonts()
+        signed_in = sign_in(media)
         options = dict(spec.get("options") or {})
         if use_look(render, spec.get("look")):
             options["style"] = "custom"
@@ -210,7 +253,7 @@ def make(spec, web, work):
         traceback.print_exc()
         try:
             from studio import safe as _safe
-            why = _safe.friendly(e, 300)
+            why = explain(e, bool(os.environ.get("YT_COOKIES"))) or _safe.friendly(e, 300)
         except Exception:  # noqa: BLE001
             why = str(e)[-300:]
         tell({"status": "error", "stage": "Stopped", "progress": 0, "error": why})
@@ -236,7 +279,7 @@ def make(spec, web, work):
             for c in job["clips"]:
                 if c.get("status") in ("queued", "rendering"):
                     c.update(status="error", error="The video stopped before this clip was made.")
-            job.update(status="error", error=safe.friendly(e), stage="Stopped")
+            job.update(status="error", error=explain(e, signed_in) or safe.friendly(e), stage="Stopped")
 
     worker = threading.Thread(target=run, daemon=True)
     worker.start()
@@ -319,6 +362,7 @@ def remake(spec, web, work):
         from studio import media, render, roman, safe
 
         render.install_fonts()
+        sign_in(media)
         if use_look(render, clip.get("look")):
             clip = dict(clip, style="custom")
         start, end = float(clip["start"]), float(clip["end"])
@@ -356,7 +400,7 @@ def remake(spec, web, work):
         traceback.print_exc()
         try:
             from studio import safe as _safe
-            why = _safe.friendly(e, 300)
+            why = explain(e, bool(os.environ.get("YT_COOKIES"))) or _safe.friendly(e, 300)
         except Exception:  # noqa: BLE001
             why = str(e)[-300:]
         done(why)

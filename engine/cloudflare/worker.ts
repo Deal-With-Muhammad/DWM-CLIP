@@ -3,7 +3,7 @@
 // Follows Cloudflare's "Durable Object Container API" guide.
 import { DurableObject } from "cloudflare:workers";
 
-type Env = { ENGINE: DurableObjectNamespace<ClipEngine>; ENGINE_SECRET: string; YTDLP_PROXY?: string };
+type Env = { ENGINE: DurableObjectNamespace<ClipEngine>; ENGINE_SECRET: string; YTDLP_PROXY?: string; YT_COOKIES?: string };
 
 const PORT = 8080;
 // A long stream can take a while, and nothing calls the container while it works.
@@ -43,7 +43,8 @@ export class ClipEngine extends DurableObject<Env> {
         image: container.images.base,
         instance: "standard-3", // 2 vCPU, 8 GiB: enough for the speech model and a 1080p render
         enableInternet: true,
-        env: { ENGINE_SECRET: this.env.ENGINE_SECRET, ENGINE_ONE_SHOT: "1", ...proxy },
+        // YT_COOKIES: a YouTube account's cookies, so age-restricted videos can be fetched (see set-youtube-cookies.sh).
+        env: { ENGINE_SECRET: this.env.ENGINE_SECRET, ENGINE_ONE_SHOT: "1", ...proxy, ...(this.env.YT_COOKIES ? { YT_COOKIES: this.env.YT_COOKIES } : {}) },
       });
     }
     this.observeExit();

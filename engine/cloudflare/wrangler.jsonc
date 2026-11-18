@@ -18,6 +18,8 @@
   ],
   "durable_objects": { "bindings": [{ "name": "ENGINE", "class_name": "ClipEngine" }] },
   "exports": { "ClipEngine": { "type": "durable-object", "storage": "sqlite" } }
+  // Optional secret: YT_COOKIES, a YouTube account's cookies, set with ../set-youtube-cookies.sh. With it the
+  // engine can fetch age-restricted videos, and YouTube asks it to "confirm you're not a bot" far less often.
   // Optional secret: YTDLP_PROXY, an http(s) proxy address used for downloads when YouTube
   // turns away Cloudflare's addresses ("sign in to confirm you're not a bot").
 }
