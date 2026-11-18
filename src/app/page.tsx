@@ -40,7 +40,7 @@ const FAQ = [
 export default async function Home() {
   const user = await currentUser().catch(() => null);
   const plans = [
-    { plan: FREE, line: "Try it with your own AI key", cta: "Start free", href: "/signup", rows: [`${FREE.clips} clips to try it`, "Bring your own AI key", `${formatBytes(FREE.storage)} of storage`, `Videos up to ${FREE.maxHours} hour`, "Edit your clips"] },
+    { plan: FREE, line: "Try it with your own AI key", cta: "Start free", href: "/signup", rows: ["Clip until your storage is full", "Bring your own AI key", `${formatBytes(FREE.storage)} of storage, about 8 clips`, `Videos up to ${FREE.maxHours} hour`, "Edit your clips"] },
     {
       plan: LITE,
       line: "For posting a few times a week",
@@ -101,7 +101,7 @@ export default async function Home() {
               <div className="mt-7">
                 <TryBox />
                 <p className="mt-3 text-[13.5px] text-white/65">
-                  Free to try: {FREE.clips} clips, no card. Plans from ${LITE.price} a month.
+                  Free with your own AI key, no card. Plans from ${LITE.price} a month.
                 </p>
               </div>
               <p className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-white/65">

@@ -193,7 +193,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
         )}
         {!problem && !needsKey && account.clipsLeft <= 0 && (
           <Note tone="warn">
-            {free ? "You've used your 2 free clips." : "You've used this month's clips. They reset on the 1st."}{" "}
+            {free ? "You've reached the free plan's limit for this month. It resets on the 1st." : "You've used this month's clips. They reset on the 1st."}{" "}
             {account.plan !== "pro" && (
               <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
                 {free ? "Pick a plan from $2" : "Move up to Pro"}
@@ -311,17 +311,24 @@ function Meters({ account }: { account: Account }) {
     <section className="mt-4 grid gap-3 sm:grid-cols-2">
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[13.5px] text-muted">{free ? "Free clips" : "Clips this month"}</p>
-          <p className="text-[13.5px] tabular-nums">
-            <span className="font-semibold">{account.clipsLeft}</span> of {account.clips} left
-            {account.plan !== "pro" && (
-              <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
-                Get more
-              </Link>
-            )}
-          </p>
+          <p className="text-[13.5px] text-muted">Clips this month</p>
+          {free ? (
+            <p className="text-[13.5px] tabular-nums">
+              <span className="font-semibold">{account.clipsMade}</span> made
+            </p>
+          ) : (
+            <p className="text-[13.5px] tabular-nums">
+              <span className="font-semibold">{account.clipsLeft}</span> of {account.clips} left
+              {account.plan !== "pro" && (
+                <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
+                  Get more
+                </Link>
+              )}
+            </p>
+          )}
         </div>
-        <Bar value={account.clipsMade / account.clips} />
+        {/* On Free there is no count to run out of: the storage beside this is the limit. */}
+        {free ? <p className="mt-2 text-[12.5px] leading-snug text-muted">Your storage is the limit. Delete clips to make room for new ones.</p> : <Bar value={account.clipsMade / account.clips} />}
       </div>
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">

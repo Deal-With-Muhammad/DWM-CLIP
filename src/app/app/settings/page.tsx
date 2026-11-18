@@ -16,7 +16,7 @@ import { PayButton } from "./pay-button";
 export const metadata = { title: "Settings", robots: { index: false, follow: false } };
 
 const rows = (p: Plan) => [
-  p.id === "free" ? `${p.clips} clips to try it` : `${p.clips} clips every month`,
+  p.id === "free" ? "Clip until your storage is full" : `${p.clips} clips every month`,
   p.ourAi ? "Our AI, no key needed" : "Your own AI key",
   `${formatBytes(p.storage)} of storage`,
   `Videos up to ${p.maxHours} hour${p.maxHours === 1 ? "" : "s"}`,
@@ -65,7 +65,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-[20px]">Your plan: {account.planName}</h2>
             <p className="text-[14px] text-muted">
-              {account.clipsLeft} of {account.clips} clips left{paid ? " this month" : ""} · {formatBytes(account.used)} of {formatBytes(account.storage)} used
+              {paid ? `${account.clipsLeft} of ${account.clips} clips left this month` : `${account.clipsMade} clip${account.clipsMade === 1 ? "" : "s"} made this month`} · {formatBytes(account.used)} of {formatBytes(account.storage)} used
             </p>
           </div>
           {account.planEnds && paid && <p className="mt-2 text-[14px] text-warn-ink">Your plan is cancelled and stays on until {day(account.planEnds)}.</p>}

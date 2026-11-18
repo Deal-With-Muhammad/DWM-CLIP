@@ -12,7 +12,8 @@ export type Plan = {
   /** US dollars a month. */
   price: number;
   storage: number;
-  /** Clips per calendar month (in total, ever, on Free). */
+  /** Clips per calendar month. On Free the member's storage is the real limit; this is only a ceiling
+   *  nobody clipping by hand reaches, so one account can't run the engine all month at our cost. */
   clips: number;
   clipsPerVideo: number;
   maxHours: number;
@@ -23,7 +24,7 @@ export type Plan = {
   ourAi: boolean;
 };
 
-export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 2, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720, ourAi: false };
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720, ourAi: false };
 export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 20, clipsPerVideo: 5, maxHours: 2, jobsAtOnce: 1, quality: 1080, ourAi: true };
 export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 150, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, ourAi: true };
 

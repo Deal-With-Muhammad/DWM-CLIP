@@ -23,7 +23,7 @@ export type Account = {
   /** Bytes allowed and used. */
   storage: number;
   used: number;
-  /** Clips allowed in this period (the month on a paid plan, in total on Free), and made so far. */
+  /** Clips allowed this calendar month, and made so far. */
   clips: number;
   clipsMade: number;
   clipsLeft: number;
@@ -55,7 +55,7 @@ export async function accountOf(user: User): Promise<Account> {
   const id: PlanId = proSub || given === "pro" ? "pro" : liteSub || given === "lite" ? "lite" : "free";
   const plan = PLANS[id];
   const packs = id === "free" ? 0 : active.filter((s) => s.kind === "storage").reduce((n, s) => n + Math.max(1, s.quantity), 0);
-  const made = id === "free" ? usage.reduce((n, u) => n + u.clips, 0) : (usage.find((u) => u.month === month())?.clips ?? 0);
+  const made = usage.find((u) => u.month === month())?.clips ?? 0;
   const sub = id === "pro" ? proSub : id === "lite" ? liteSub : undefined;
   return {
     plan: id,

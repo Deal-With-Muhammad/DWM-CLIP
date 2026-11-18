@@ -52,9 +52,9 @@ export async function POST(req: Request) {
 
   const account = await accountOf(user);
   if (account.clipsLeft <= 0) {
-    return fail(402, account.plan === "free" ? "You've used your free clips. Pick a plan to keep clipping." : "You've used this month's clips. They reset on the 1st.", { upgrade: account.plan !== "pro" });
+    return fail(402, account.plan === "free" ? "You've reached the free plan's limit for this month. It resets on the 1st, or pick a plan to keep going." : "You've used this month's clips. They reset on the 1st.", { upgrade: account.plan !== "pro" });
   }
-  if (account.used >= account.storage) return fail(402, "Your storage is full. Delete some clips or add storage.", { upgrade: true });
+  if (account.used >= account.storage) return fail(402, account.plan === "free" ? "Your storage is full. Delete some clips to make room, or pick a plan for more." : "Your storage is full. Delete some clips or add storage.", { upgrade: true });
   const running = await first<{ n: number }>("select count(*) as n from jobs where user_id = ? and status in ('queued', 'running')", user.id);
   if ((running?.n ?? 0) >= account.jobsAtOnce) return fail(409, account.jobsAtOnce === 1 ? "One video at a time on this plan. Wait for this one to finish." : "Two videos are already being clipped. Wait for one to finish.");
 

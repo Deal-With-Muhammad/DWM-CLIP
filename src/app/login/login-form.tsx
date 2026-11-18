@@ -73,7 +73,7 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
           {reauth
             ? "The admin area asks for a fresh code every 12 hours."
             : signup
-              ? "Enter your email and we'll send a 6-digit code to confirm it. You get 2 free clips, no card needed."
+              ? "Enter your email and we'll send a 6-digit code to confirm it. It's free with your own AI key, no card needed."
               : "Enter your email and we'll send you a 6-digit code. There's no password to remember."}
         </p>
         <form

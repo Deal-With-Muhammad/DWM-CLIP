@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/server/session";
 
 import { LoginForm } from "../login/login-form";
 
-export const metadata = { title: "Sign up", description: "Create a free DWM Clip account and make your first two clips.", alternates: { canonical: "/signup" } };
+export const metadata = { title: "Sign up", description: "Create a free DWM Clip account and make your first clips.", alternates: { canonical: "/signup" } };
 
 // Signing up and signing in work the same way (a code sent by email); only the words differ.
 // Someone who signs up with an address that already has an account is simply signed in.
