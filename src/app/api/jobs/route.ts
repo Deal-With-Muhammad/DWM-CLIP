@@ -40,14 +40,14 @@ const between = (v: unknown, lo: number, hi: number, fallback: number) => (typeo
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
-  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown };
+  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; ownKey?: unknown; focus?: unknown; look?: unknown };
   try {
     body = await req.json();
   } catch {
     return fail(400, "Invalid request.");
   }
   const url = videoUrl(body.url);
-  if (!url) return fail(400, "Paste a YouTube, Twitch or Kick video link.");
+  if (!url) return fail(400, "Paste a YouTube, Twitch or Kick link: a video, or a stream that is live now.");
   if ((await hit(`clip:job:${user.id}`, 3600)) > 30) return fail(429, "That's a lot of videos in an hour. Try again a little later.");
 
   const account = await accountOf(user);
@@ -70,10 +70,11 @@ export async function POST(req: Request) {
     if (!key) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
     ai = { provider: setting("AI_PROVIDER") || "gemini", model: setting("AI_MODEL") || "gemini-2.5-flash-lite", key };
   }
-  // A member's own Gemini key: a retired model is swapped for the one Google replaced it with, and the small
-  // current model is kept as a second try, so one model that won't answer doesn't leave the clips without the AI.
+  // A member's own Gemini key: a retired model is swapped for the one Google replaced it with, and the other
+  // current models are kept as further tries. A free key has a separate small allowance for each model, so one
+  // model that has run out doesn't leave the clips without the AI.
   if (useOwn && ai.provider === "gemini") {
-    ai = { ...ai, model: [...new Set([RETIRED_MODELS[ai.model], ai.model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter(Boolean))].join(",") };
+    ai = { ...ai, model: [...new Set([RETIRED_MODELS[ai.model], ai.model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"].filter(Boolean))].join(",") };
   }
   if (!engineReady()) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
 
@@ -88,6 +89,8 @@ export async function POST(req: Request) {
     style: STYLES.some((s) => s.id === body.style) ? (body.style as string) : "bounce",
     layout: ENGINE_LAYOUT[LAYOUTS.some((l) => l.id === body.layout) ? (body.layout as string) : "auto"],
     captions: body.captions !== false,
+    // Pauses where nobody speaks and nothing happens are cut out of each clip, unless the member says to leave them.
+    tighten: body.tighten !== false,
     quality: account.quality,
   };
   // What the member asked the AI to look for: one short line of plain text.

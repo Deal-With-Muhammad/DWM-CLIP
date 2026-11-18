@@ -36,11 +36,27 @@ export async function POST(req: Request) {
     const said = tried.length ? ` ${text(tried[0].model, 60)}: ${message(tried[0].error)}` : "";
     note = `The AI didn't answer, so the loudest moments were picked, without headings or titles. ${said ? `The service said about${said}` : why || "Check your AI key and model in Settings."}`.slice(0, 480);
     console.error("ai gave no answer", id, JSON.stringify(tried).slice(0, 1500));
-  } else if (b.facecam === false && status !== "error") note = "This video has no streamer webcam, so the game fills the screen.";
+  } else {
+    const parts: string[] = [];
+    // A stream that was on air when it was clipped: say how much of it the clips were picked from.
+    if (b.live === true && status !== "error") {
+      const hours = num(b.live_hours);
+      const last = hours >= 1 ? `${hours === 1 ? "hour" : `${Math.round(hours)} hours`}` : `${Math.round(hours * 60)} minutes`;
+      parts.push(b.live_whole === true ? "This stream was live, so the clips come from what had been broadcast so far." : `This stream was live. The clips come from its last ${last}, the most your plan takes.`);
+    }
+    if (b.facecam === false && status !== "error") parts.push("There is no streamer webcam in it, so the game fills the screen.");
+    // Parts of a long video the AI service never answered for (a busy or rate-limited key): they have no clips.
+    const skipped = Math.round(num(b.ai_skipped));
+    if (skipped > 0 && status === "done") parts.push(`The AI service was too busy to look at ${skipped === 1 ? "one part" : `${skipped} parts`} of it, so ${skipped === 1 ? "that part has" : "those have"} no clips.`);
+    if (parts.length) note = parts.join(" ");
+  }
   if (b.storage_full === true) note = "Your storage filled up, so the rest of the clips weren't saved.";
   let error = status === "error" ? text(b.error, 500) || "Something went wrong with this video." : null;
   // The engine's messages name the tool it's built on; members only know this site.
   if (error) error = error.replace(/PeakCut/g, "DWM Clip").replace(/Upload the video file instead, or use a/, "Try a");
+  // A live channel link is swapped for the link of that broadcast's recording, which still works once the stream ends.
+  const source = text(b.source_url, 300);
+  if (/^https:\/\/(www\.)?(twitch\.tv\/videos\/\d+|kick\.com\/[A-Za-z0-9_-]+\/videos\/[0-9a-f-]{36})$/.test(source)) await run("update jobs set url = ? where id = ? and url != ?", source, id, source);
   await run(
     `update jobs set status = ?, stage = ?, progress = ?, title = case when ? != '' then ? else title end, uploader = ?, duration = ?, game = ?,
        error = ?, note = ?, model = coalesce(?, model), tokens = ?, found = ?, failed = ?, facecam = coalesce(?, facecam), updated_at = ?, finished_at = ? where id = ?`,

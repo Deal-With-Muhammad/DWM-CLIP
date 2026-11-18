@@ -22,6 +22,9 @@ from pathlib import Path
 
 import httpx
 
+import editing
+import live_source
+
 HERE = Path(__file__).resolve().parent
 PAD = 8          # seconds fetched either side of a clip, the same as PeakCut keeps
 
@@ -95,8 +98,10 @@ def explain(e, signed_in=False):
                 else "This video is age-restricted on YouTube, so it can't be clipped yet. Try a different video.")
     if re.search(r"not a bot|confirm you.?re not|isn't letting .* download", s, re.I):
         return "YouTube refused to give this video to our server just now. Try again in a few minutes, or use a Twitch or Kick link."
+    if isinstance(e, live_source.NoRecording) or "live stream couldn't be fetched" in s or "isn't in its recording yet" in s or "only just started" in s:
+        return s
     if re.search(r"is a live stream|live event will begin|Premieres in|is offline", s, re.I):
-        return "This stream is still live, or hasn't started. Paste the link again once it has ended."
+        return "This stream hasn't started, is offline, or keeps no recording while it's live. Paste the link again once it's on air, or after it has ended."
     # The engine's own wording points at an "Options" setting the website doesn't have.
     too_long = re.search(r"longer than ([\d.]+) hours", s)
     if too_long:
@@ -157,8 +162,10 @@ def send(web, job_id: str, clip_id: str, part: str, body, kind: str, head: dict,
     return 0
 
 
-def clip_head(clip: dict, look=None, video_title="") -> dict:
+def clip_head(clip: dict, look=None, video_title="", base=0.0) -> dict:
     meta = {k: clip.get(k) for k in ("title", "hook", "description", "hashtags", "score", "category", "start", "end", "layout", "style")}
+    if base:
+        meta["start"], meta["end"] = round(clip["start"] + base, 2), round(clip["end"] + base, 2)
     meta["title"] = meta["title"] or str(video_title or "")[:90]      # a clip the AI didn't name is called after its video
     meta["captions"] = bool(clip.get("captions", True))
     meta["look"] = look if isinstance(look, dict) else None
@@ -177,9 +184,12 @@ def ai_error(job) -> str:
 
 
 AI_SAID = {}
+AI_PICKED = [False]     # the AI has picked moments for at least one part of this video
+AI_WAITED = [0.0]       # seconds spent waiting for the AI service's rate limit to pass, over the whole video
+AI_SKIPPED = [0]        # parts of the video the AI never answered for, which were left without clips
 
 
-def keep_ai_reason(ai):
+def keep_ai_reason(ai, brain=None):
     """The engine turns a refused AI call into a sentence about its own dashboard and drops what the service
     said. That reply (which model, which limit) is what tells a member, or us, what to change, so it is kept."""
     call = ai.call
@@ -187,16 +197,22 @@ def keep_ai_reason(ai):
 
     def kept(model, *a, **k):
         try:
-            return call(model, *a, **k)
+            out = call(model, *a, **k)
         except Exception as e:  # noqa: BLE001 - noted, then left to the engine as before
             AI_SAID.setdefault(str(model), str(e)[:400])     # the first reply for each model tried
             # A free key answers only a few questions a minute, and the engine's own retries all fall inside
-            # that minute. Once per model, wait for the next minute and ask again before giving up on it.
-            if "HTTP 429" not in str(e) or model in waited or k.get("timeout") or (len(a) > 2 and a[2]):
+            # that minute. Once per model for each question (a long video is asked about part by part), wait
+            # for the next minute and ask again before giving up on it: ten minutes of waiting at most a video.
+            asked = (model, hash(a[0]) if a else 0)
+            if "HTTP 429" not in str(e) or asked in waited or AI_WAITED[0] >= 600 or k.get("timeout") or (len(a) > 2 and a[2]):
                 raise
-            waited.add(model)
+            waited.add(asked)
+            AI_WAITED[0] += 45
             time.sleep(45)
-            return call(model, *a, **k)
+            out = call(model, *a, **k)
+        if brain is not None and len(a) > 1 and a[1] is brain.SCHEMA:
+            AI_PICKED[0] = True
+        return out
 
     ai.call = kept
 
@@ -207,6 +223,12 @@ def no_stamp(brain):
     loudest = brain.fallback_by_loudness
 
     def plain(*a, **k):
+        if AI_PICKED[0]:
+            # The AI is picking the moments of this video and only this part got no answer. A clip from here
+            # would be the odd one out, with no heading or title: the part is left out, and the clips it would
+            # have had are looked for in the parts that follow.
+            AI_SKIPPED[0] += 1
+            return []
         picks = loudest(*a, **k)
         for p in picks:
             p["hook"], p["title"] = "", ""
@@ -224,12 +246,14 @@ def make(spec, web, work):
         except httpx.HTTPError:
             return 0
 
+    live = {"on": False, "base": 0.0, "url": "", "whole": True, "hours": 0}
     try:
-        from studio import auth, brain, ctx, db, facecam, jobs, media, render, safe
+        from studio import auth, brain, ctx, db, facecam, jobs, media, render, roman, safe
 
         no_stamp(brain)
+        editing.install(render, brain, roman)
         from studio import ai as ai_service
-        keep_ai_reason(ai_service)
+        keep_ai_reason(ai_service, brain)
 
         db.init()
         user = auth.local_user()
@@ -238,6 +262,8 @@ def make(spec, web, work):
         render.install_fonts()
         signed_in = sign_in(media)
         options = dict(spec.get("options") or {})
+        tighten = options.pop("tighten", False) is True
+        editing.SHORTEST[0] = float(options.get("min_len") or 0)
         if use_look(render, spec.get("look")):
             options["style"] = "custom"
 
@@ -303,13 +329,29 @@ def make(spec, web, work):
             box, dims = clip.get("facecam"), looked.get("dims")
             if box and dims and dims[0]:
                 clip = dict(clip, facecam=[round(v * src_w / dims[0]) for v in box])
-            return draw(src, out_dir, name, clip, words, src_w, src_h)
+            return draw(src, out_dir, name, dict(clip, tighten=tighten), words, src_w, src_h)
 
         render.render_clip = render_clip
 
         # The title is read first: it names the game (GTA VI and so on), which decides the hooks and hashtags.
         tell({"status": "running", "stage": "Opening the video", "progress": 0.01})
-        name = media.info(spec["url"])["title"]
+        first = media.info(spec["url"])
+        name = first["title"]
+        if first["is_live"]:
+            # On air right now: the clips come from what has been broadcast so far. The most recent hours are
+            # looked at, as many as the plan takes, and the engine sees them as a video that starts at zero.
+            tell({"status": "running", "stage": "Opening the live stream", "progress": 0.02})
+            stream = live_source.open_live(spec["url"], media)
+            if not stream:
+                raise RuntimeError("This is a live stream with nothing recorded to clip from.")
+            so_far, most = stream.length(), float(spec.get("max_hours") or 3) * 3600
+            if so_far < 120:
+                raise live_source.NoRecording("This stream has only just started. Give it a few minutes, then paste the link again.")
+            # A piece of the recording is up to twelve seconds long, and the stretch must not run over the plan's hours.
+            live["base"] = stream.align(so_far - most + 15) if so_far > most else 0.0
+            live.update(on=True, url=stream.url, whole=live["base"] == 0, hours=most / 3600)
+            live_source.use(media, stream, live["base"], so_far - live["base"])
+            name = stream.title or name
         job = jobs.create({"type": "url", "url": spec["url"], "name": name}, options, enqueue=False)
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
@@ -356,18 +398,30 @@ def make(spec, web, work):
             words = []
         return [w for w in words if clip["start"] - PAD - 2 <= w["s"] <= clip["end"] + PAD + 2]
 
+    base = live["base"]
+
+    def at(words) -> list:
+        """Words on the stream's own clock (a live stream is looked at from `base`, which the engine calls zero)."""
+        return [dict(w, s=round(w["s"] + base, 2), e=round(w["e"] + base, 2)) for w in words or []] if base else list(words or [])
+
     def upload(clip) -> bool:
         """One finished clip: the cover picture, what is needed to remake it, then the video. False once storage is full."""
         folder = Path(job["dir"]) / "clips"
-        head = clip_head(clip, spec.get("look"), job.get("title"))
+        head = clip_head(clip, spec.get("look"), job.get("title"), base)
         cover, video = folder / str(clip.get("cover")), folder / str(clip.get("file"))
         if not (clip.get("file") and video.is_file()):
             return True
         if clip.get("cover") and cover.is_file():
             send(web, spec["id"], clip["id"], "cover", cover, "image/jpeg", head)
-        data = {"start": clip["start"], "end": clip["end"], "hook": clip.get("hook") or "", "highlight_words": clip.get("highlight_words") or [],
-                "facecam": clip.get("facecam"), "facecam_dims": looked.get("dims"), "quality": int(job["options"]["quality"]), "words": words_near(clip),
-                "fixed_words": clip.get("fixed_words") or [], "fixed_for": clip.get("fixed_for")}
+        span = clip.get("fixed_for")
+        data = {"start": round(clip["start"] + base, 2), "end": round(clip["end"] + base, 2), "hook": clip.get("hook") or "",
+                "highlight_words": clip.get("highlight_words") or [],
+                "facecam": clip.get("facecam"), "facecam_dims": looked.get("dims"), "quality": int(job["options"]["quality"]), "words": at(words_near(clip)),
+                "fixed_words": at(clip.get("fixed_words")),
+                "fixed_for": [round(span[0] + base, 2), round(span[1] + base, 2), *span[2:]] if span and base else span,
+                # The later headings, when on the stream's clock each one comes in; whether quiet stretches are cut.
+                "beats": [{"at": round(clip["start"] + base + b["t"], 2), "text": b["text"]} for b in clip.get("beats") or []],
+                "tighten": tighten, "live": live["on"], "source": live["url"]}
         send(web, spec["id"], clip["id"], "data", json.dumps(data).encode(), "application/json", head)
         code = send(web, spec["id"], clip["id"], "video", video, "video/mp4", head)
         for f in (cover, video):
@@ -385,11 +439,14 @@ def make(spec, web, work):
         body = {
             "status": job["status"] if final or job["status"] != "done" else "running",
             "stage": job.get("stage") or "", "progress": round(float(job.get("progress") or 0), 3),
-            "title": job.get("title") or "", "uploader": job.get("uploader") or "", "duration": job.get("duration") or 0,
+            "title": job.get("title") or "", "uploader": job.get("uploader") or "", "duration": round((job.get("duration") or 0) + base),
+            # A live stream: where its recording is, and how much of it the clips were picked from.
+            "live": live["on"], "source_url": live["url"], "live_whole": live["whole"], "live_hours": live["hours"],
             "game": job.get("game") or "", "error": job.get("error"),
             "model": (job.get("ai") or {}).get("model"), "tokens": (job.get("ai") or {}).get("tokens", 0),
             "note": (job.get("ai") or {}).get("note") or "",
             "ai_error": ai_error(job),
+            "ai_skipped": AI_SKIPPED[0],
             # Each model tried and what the service replied, the member's own choice first.
             "ai_said": [{"model": m, "error": e} for m, e in AI_SAID.items()][:4] if not (job.get("ai") or {}).get("model") else [],
             "failed": [{"id": c["id"], "error": c.get("error") or ""} for c in job["clips"] if c.get("status") == "error"],
@@ -427,7 +484,15 @@ def remake(spec, web, work):
         from studio import media, render, roman, safe
 
         render.install_fonts()
+        editing.install(render)
         sign_in(media)
+        if spec.get("live"):            # made from a live stream: if it is still on air, this piece comes from it too
+            try:
+                stream = live_source.open_live(spec["url"], media)
+            except Exception:  # noqa: BLE001 - not on air any more, or not saying: the link is fetched as a video
+                stream = None
+            if stream:
+                live_source.use(media, stream)
         if use_look(render, clip.get("look")):
             clip = dict(clip, style="custom")
         start, end = float(clip["start"]), float(clip["end"])
@@ -447,9 +512,12 @@ def remake(spec, web, work):
         face, dims = clip.get("facecam"), clip.get("facecam_dims")
         if face and dims and dims[0]:
             face = [round(v * meta["width"] / dims[0]) for v in face]
+        beats = [{"t": round(float(b["at"]) - start, 2), "text": roman.to_roman(str(b.get("text") or ""))[:40]}
+                 for b in spec.get("beats") or [] if isinstance(b, dict) and isinstance(b.get("at"), (int, float))]
         local = {"id": clip["n"], "start": start - want, "end": end - want, "hook": roman.to_roman(str(clip.get("hook") or ""))[:60],
                  "style": clip.get("style") or "bounce", "layout": clip.get("layout") or "crop", "captions": bool(clip.get("captions", True)),
-                 "highlight_words": clip.get("highlight_words") or [], "facecam": face}
+                 "highlight_words": clip.get("highlight_words") or [], "facecam": face,
+                 "beats": beats, "tighten": spec.get("tighten") is True}
         out = render.render_clip(piece, work / "out", clip["n"], local, near, meta["width"], meta["height"])
         shown = dict(clip, id=clip["n"], start=round(start, 2), end=round(end, 2), layout=out["layout"], hook=local["hook"])
         head = clip_head(shown, clip.get("look"))

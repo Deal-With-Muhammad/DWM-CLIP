@@ -39,7 +39,7 @@ export type EngineJob = {
 };
 
 /** A changed clip to make again. `job` is the video it belongs to, which is what the engine reports back about. */
-export type EngineEdit = { id: string; mode: "edit"; job: string; url: string; callback: string; quality: number; clip: Record<string, unknown>; words: unknown; fixed_words: unknown; fixed_for: unknown };
+export type EngineEdit = { id: string; mode: "edit"; job: string; url: string; callback: string; quality: number; clip: Record<string, unknown>; words: unknown; fixed_words: unknown; fixed_for: unknown; beats: unknown[]; tighten: boolean; live: boolean };
 
 export const startEdit = (edit: EngineEdit) => send(edit, edit.job);
 

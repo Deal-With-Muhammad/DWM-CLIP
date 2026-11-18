@@ -1,4 +1,4 @@
-import { Captions, Check, Hash, MessageSquareText, Scissors, Sparkles, SquarePen, Video, Wand2 } from "lucide-react";
+import { Captions, Check, Hash, MessageSquareText, Radio, Scissors, Sparkles, SquarePen, Video, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 import { HeroVideo } from "@/components/hero-video";
@@ -12,12 +12,13 @@ import { site } from "@/lib/site";
 const FEATURES = [
   { icon: Sparkles, tint: "bg-pink-soft text-pink", title: "Finds the moments for you", text: "It reads what was said and listens for the loud parts, then picks the moments a stranger would stop scrolling for. Each one gets a score." },
   { icon: Captions, tint: "bg-violet-soft text-violet", title: "Captions, word by word", text: "Three caption styles, timed to the voice, with the word being said lit up. Or switch captions off." },
-  { icon: MessageSquareText, tint: "bg-sky-soft text-sky", title: "A hook on every clip", text: "A short line at the top taken from what happened: \"1 VS 3\", \"HE GOT ME\". You can rewrite it any time." },
+  { icon: MessageSquareText, tint: "bg-sky-soft text-sky", title: "Headings that keep up", text: "A short line opens the clip, then makes way for the next one as things happen: \"1 VS 3\", then \"HE GOT ME\". You can rewrite the opening line any time." },
   { icon: Wand2, tint: "bg-violet-soft text-violet", title: "Tell it what you want", text: "\"Only funny moments.\" \"Police chases.\" \"Titles in Spanish.\" Type it in and the AI looks for exactly that." },
   { icon: SquarePen, tint: "bg-pink-soft text-pink", title: "Change a clip after it's made", text: "New hook, another caption style, start two seconds earlier, end a little later. Save, and the clip is made again." },
   { icon: Video, tint: "bg-sky-soft text-sky", title: "The streamer stays in the picture", text: "If the video has a webcam box, it's kept in the corner of the clip. If it doesn't, the game simply fills the screen." },
   { icon: Hash, tint: "bg-pink-soft text-pink", title: "Titles and hashtags that fit", text: "Every clip comes with a title, a description and the tags people search for. It knows GTA VI and 20 more games by name." },
-  { icon: Scissors, tint: "bg-violet-soft text-violet", title: "Long streams are fine", text: "Videos up to three hours. It only fetches the parts it clips, so an hour-long stream takes minutes." },
+  { icon: Scissors, tint: "bg-violet-soft text-violet", title: "Pauses cut out", text: "Stretches where nobody talks and nothing happens are trimmed, so a clip moves like one a person edited. Switch it off to keep every second." },
+  { icon: Radio, tint: "bg-sky-soft text-sky", title: "Live streams too", text: "Paste a stream while it's still on air: the clips come from what it has shown so far. Long ones are fine, up to three hours." },
 ];
 
 const FAQ = [
@@ -27,7 +28,11 @@ const FAQ = [
   },
   {
     q: "Which videos can I clip?",
-    a: "Any public YouTube, Twitch or Kick video: streams, gameplay, podcasts, interviews. Clip videos you made or have permission to use (for example a creator's clipping campaign). You're responsible for the rights to what you post.",
+    a: "Any public YouTube, Twitch or Kick video, or a stream that is live right now: streams, gameplay, podcasts, interviews. Clip videos you made or have permission to use (for example a creator's clipping campaign). You're responsible for the rights to what you post.",
+  },
+  {
+    q: "Can I clip a stream while it's live?",
+    a: "Yes. Paste the stream's link while it's on air. The clips are picked from what has been broadcast so far: the last hour on the free plan, two hours on Lite, three on Pro. A Twitch or Kick channel has to keep recordings of its streams for this, which most do.",
   },
   { q: "How long does it take?", a: "A 20-minute video takes about three minutes. Clips appear one by one as they finish, so you can start posting before the whole video is done." },
   { q: "What if the video has no facecam?", a: "Then the game fills the screen, and the page tells you so. Nothing is made up: the webcam is only shown when the video really has one." },
@@ -126,7 +131,7 @@ export default async function Home() {
         <section id="features" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="max-w-[560px] font-display text-[32px] leading-tight">Everything a clip needs, done before you open it</h2>
-            <ul className="mt-10 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="mt-10 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
                 <li key={f.title}>
                   <span className={`grid size-10 place-items-center rounded-xl ${f.tint}`}>

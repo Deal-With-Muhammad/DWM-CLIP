@@ -55,7 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if ((await hit(`clip:edit:${user.id}`, 3600)) > 30) return fail(429, "That's a lot of changes in an hour. Try again a little later.");
 
   const saved = await env().MEDIA.get(clip.data_key);
-  let data: { words?: unknown; fixed_words?: unknown; fixed_for?: unknown; facecam?: unknown; facecam_dims?: unknown; highlight_words?: unknown; quality?: unknown } = {};
+  let data: { words?: unknown; fixed_words?: unknown; fixed_for?: unknown; facecam?: unknown; facecam_dims?: unknown; highlight_words?: unknown; quality?: unknown; beats?: unknown; tighten?: unknown; live?: unknown; source?: unknown } = {};
   try {
     data = saved ? JSON.parse(await saved.text()) : {};
   } catch {}
@@ -70,6 +70,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       mode: "edit",
       job: clip.job_id,
       url: clip.url,
+      // A clip keeps its later headings and its cuts when it is changed. One made from a live stream is fetched
+      // from that stream again while it is still on air.
+      beats: Array.isArray(data.beats) ? data.beats.slice(0, 3) : [],
+      tighten: data.tighten === true,
+      live: data.live === true,
       callback: `${siteOrigin(req)}/api/engine`,
       quality: account.quality,
       clip: { n: clip.n, ...next, style: look ? "bounce" : next.style === "custom" ? "bounce" : next.style, look, highlight_words: data.highlight_words ?? [], facecam: data.facecam ?? null, facecam_dims: data.facecam_dims ?? null },

@@ -12,12 +12,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY studio studio
-COPY runner.py server.py PEAKCUT-LICENSE ./
 
 # The speech model (about 480 MB) goes into the image, so a job never waits for it to download.
 ENV PEAKCUT_MODELS=/app/models \
     PYTHONUNBUFFERED=1
 RUN PEAKCUT_DATA=/tmp/build python -c "from studio import fetch_model; fetch_model.ensure()" && rm -rf /tmp/build
+
+# Our own files come after the model, so changing them doesn't download it again.
+COPY runner.py editing.py live_source.py server.py PEAKCUT-LICENSE ./
 
 ENV PORT=8080 \
     ENGINE_ONE_SHOT=1 \

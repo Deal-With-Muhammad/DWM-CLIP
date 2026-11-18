@@ -31,6 +31,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   const [maxLen, setMaxLen] = useState(60);
   const [style, setStyle] = useState("bounce");
   const [captions, setCaptions] = useState(true);
+  const [tighten, setTighten] = useState(true);
   const [look, setLook] = useState<Look>(DEFAULT_LOOK);
   const [layout, setLayout] = useState("auto");
   const [focus, setFocus] = useState("");
@@ -63,7 +64,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), clips, maxLen, style, captions, layout, focus, look: style === "custom" ? look : null }),
+        body: JSON.stringify({ url: url.trim(), clips, maxLen, style, captions, tighten, layout, focus, look: style === "custom" ? look : null }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return setProblem({ text: j.error || "Something went wrong. Please try again.", upgrade: j.upgrade, needsKey: j.needsKey });
@@ -90,8 +91,8 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   return (
     <div className="mx-auto w-full max-w-[1080px] px-4 pb-20 sm:px-6">
       <section className="card rise mt-6 p-4 sm:p-6">
-        <h1 className="font-display text-[24px] leading-tight sm:text-[28px]">Paste a video link</h1>
-        <p className="mt-1.5 text-[14.5px] text-muted">YouTube, Twitch or Kick. Streams and long videos work best.</p>
+        <h1 className="font-display text-[24px] leading-tight sm:text-[28px]">Paste a video or live stream link</h1>
+        <p className="mt-1.5 text-[14.5px] text-muted">YouTube, Twitch or Kick. A stream can still be live: the clips come from what it has shown so far.</p>
         <form
           className="mt-4 flex flex-col gap-2.5 sm:flex-row"
           onSubmit={(e) => {
@@ -140,6 +141,16 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
                   {l.label}
                 </button>
               ))}
+            </div>
+          </Choice>
+          <Choice label="Quiet parts" hint={tighten ? "Pauses where nobody talks and nothing happens are cut out, so the clip moves faster." : "Each clip is one unbroken piece of the video."}>
+            <div className="seg">
+              <button type="button" aria-pressed={tighten} onClick={() => setTighten(true)}>
+                Cut them out
+              </button>
+              <button type="button" aria-pressed={!tighten} onClick={() => setTighten(false)}>
+                Keep them
+              </button>
             </div>
           </Choice>
           <label className="block md:col-span-2">
