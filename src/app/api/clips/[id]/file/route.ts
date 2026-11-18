@@ -1,15 +1,19 @@
 import { env, first } from "@/lib/server/db";
 import { fail } from "@/lib/server/http";
-import { currentUser } from "@/lib/server/session";
+import { currentUser, isAdminEmail } from "@/lib/server/session";
 
-// A clip's video or cover picture, for its owner only. Videos answer range requests, so the player can seek.
+// A clip's video or cover picture, for its owner (and the admin, who looks after the site). Videos answer range
+// requests, so the player can seek.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
   const { id } = await params;
   const url = new URL(req.url);
   const cover = url.searchParams.get("part") === "cover";
-  const clip = await first<{ video_key: string; cover_key: string | null; title: string; n: string }>("select video_key, cover_key, title, n from clips where id = ? and user_id = ?", id, user.id);
+  type Row = { video_key: string; cover_key: string | null; title: string; n: string };
+  const clip = isAdminEmail(user.email)
+    ? await first<Row>("select video_key, cover_key, title, n from clips where id = ?", id)
+    : await first<Row>("select video_key, cover_key, title, n from clips where id = ? and user_id = ?", id, user.id);
   const key = cover ? clip?.cover_key : clip?.video_key;
   if (!clip || !key) return fail(404, "Not found.");
 

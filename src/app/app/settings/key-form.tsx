@@ -1,9 +1,11 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PROVIDERS } from "@/lib/plans";
+
+import { ModelPicker } from "./model-picker";
 
 type Saved = { provider: string; model: string; tail: string; updatedAt: string } | null;
 
@@ -16,6 +18,30 @@ export function KeyForm({ saved: initial }: { saved: Saved }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const p = PROVIDERS.find((x) => x.id === provider) ?? PROVIDERS[0];
+
+  // The service's own list of models, fetched with the key being typed or the saved one (OpenRouter's is public).
+  // Kept with what it was fetched for, so a list for another service or key is never shown.
+  const typed = key.trim().length >= 16 ? key.trim() : "";
+  const source = `${provider}:${typed || (saved?.provider === provider ? `saved ${saved.tail}` : "")}`;
+  const canList = provider === "openrouter" || !source.endsWith(":");
+  const [listed, setListed] = useState<{ source: string; models: string[] } | null>(null);
+  useEffect(() => {
+    if (!canList) return;
+    const stop = new AbortController();
+    const wait = setTimeout(
+      async () => {
+        const res = await fetch("/api/keys/models", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider, key: typed }), signal: stop.signal }).catch(() => null);
+        const j = await res?.json().catch(() => null);
+        if (!stop.signal.aborted && Array.isArray(j?.models)) setListed({ source, models: j.models });
+      },
+      typed ? 600 : 0, // while a key is being pasted or typed, wait for it to settle
+    );
+    return () => {
+      clearTimeout(wait);
+      stop.abort();
+    };
+  }, [provider, typed, source, canList]);
+  const live = canList && listed?.source === source && listed.models.length > 0 ? listed.models : null;
 
   const save = async () => {
     setBusy(true);
@@ -44,14 +70,14 @@ export function KeyForm({ saved: initial }: { saved: Saved }) {
           </span>
           <button
             type="button"
-            className="text-danger underline underline-offset-4"
+            className="rounded-lg bg-danger-soft px-2.5 py-1 text-[13.5px] font-medium text-danger"
             onClick={async () => {
               await fetch("/api/keys", { method: "DELETE" });
               setSaved(null);
               setMessage(null);
             }}
           >
-            Remove
+            Remove key
           </button>
         </p>
       )}
@@ -76,7 +102,8 @@ export function KeyForm({ saved: initial }: { saved: Saved }) {
         </label>
         <label className="block text-[14px]">
           <span className="mb-1.5 block font-medium">Model</span>
-          <input value={model} onChange={(e) => setModel(e.target.value)} spellCheck={false} autoCapitalize="none" className="field-native font-mono text-[14px]" />
+          <ModelPicker value={model} onChange={setModel} options={live ?? p.models} />
+          <span className="mt-1.5 block text-[12.5px] text-muted">{live ? `${live.length} models from ${p.label}. Type to search.` : `A few to start with. Paste your key to see every ${p.label} model.`}</span>
         </label>
       </div>
       <label className="block text-[14px]">

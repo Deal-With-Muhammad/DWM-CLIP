@@ -72,10 +72,13 @@ export async function POST(req: Request) {
   }
   if (!engineReady()) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
 
+  // The length the member chose is the longest a clip may be; two thirds of it is the shortest, so "60 sec"
+  // gives clips of 40 to 60 seconds and never a 17-second one.
+  const maxLen = between(body.maxLen, 20, 90, 60);
   const options = {
     max_clips: Math.min(between(body.clips, 1, 20, 3), account.clipsPerVideo, account.clipsLeft),
-    min_len: 15,
-    max_len: between(body.maxLen, 20, 90, 60),
+    min_len: Math.round((maxLen * 2) / 3),
+    max_len: maxLen,
     // "custom" is the member's own look, sent to the engine beside the options.
     style: STYLES.some((s) => s.id === body.style) ? (body.style as string) : "bounce",
     layout: ENGINE_LAYOUT[LAYOUTS.some((l) => l.id === body.layout) ? (body.layout as string) : "auto"],

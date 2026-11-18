@@ -55,7 +55,7 @@ export async function keyInfo(userId: string) {
   return { provider: r.provider, model: r.model, tail, updatedAt: r.updated_at };
 }
 
-/** For the clip engine only. */
+/** The key itself: for the clip engine, and for asking the service which models it offers. Never sent to the browser. */
 export async function keyFor(userId: string) {
   const r = await first<Row>("select provider, model, key_enc, updated_at from ai_keys where user_id = ?", userId);
   if (!r) return null;

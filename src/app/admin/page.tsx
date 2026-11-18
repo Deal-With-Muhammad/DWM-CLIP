@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
@@ -7,6 +8,8 @@ import { all, first } from "@/lib/server/db";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
 import { setBonus, setPlan } from "./actions";
+import { DeleteClip } from "./delete-clip";
+import { When } from "./when";
 
 export const metadata = { title: "Admin", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -14,6 +17,8 @@ export const dynamic = "force-dynamic";
 type Day = { day: string; n: number };
 
 const DAYS = 14;
+/** Videos on one page of the list. */
+const PER_PAGE = 20;
 
 /** The last 14 days, oldest first, with 0 for days nothing happened. */
 function fill(rows: Day[]) {
@@ -27,11 +32,12 @@ function fill(rows: Day[]) {
 /** The time this many days ago, as the database stores it. */
 const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login?next=/admin");
   if (!isAdminEmail(user.email)) notFound();
 
+  const asked = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
   const since = ago(DAYS);
   const week = ago(7);
   const now = ago(0);
@@ -63,16 +69,28 @@ export default async function AdminPage() {
       now,
     ),
     all<{ id: string; email: string; title: string; url: string; status: string; error: string | null; ai_mode: string; found: number; created_at: string }>(
-      "select j.id, u.email, j.title, j.url, j.status, j.error, j.ai_mode, j.found, j.created_at from jobs j join users u on u.id = j.user_id order by j.created_at desc limit 25",
+      "select j.id, u.email, j.title, j.url, j.status, j.error, j.ai_mode, j.found, j.created_at from jobs j join users u on u.id = j.user_id order by j.created_at desc limit ? offset ?",
+      PER_PAGE,
+      (asked - 1) * PER_PAGE,
     ),
     all<{ at: string; event: string; detail: string; email: string | null }>("select b.at, b.event, b.detail, u.email from billing_events b left join users u on u.id = b.user_id order by b.id desc limit 15"),
   ]);
   const t = totals!;
+  const pages = Math.max(1, Math.ceil(t.jobs / PER_PAGE));
+  // A page past the end (a clip list that shrank, a mistyped address) goes to the last one.
+  if (asked > pages) redirect(`/admin?page=${pages}#videos`);
+  const page = asked;
+  // The clips of the videos on this page, to watch or remove.
+  const clips = jobs.length
+    ? await all<{ id: string; job_id: string; title: string; start_s: number; end_s: number; bytes: number; cover_key: string | null; version: number }>(
+        `select id, job_id, title, start_s, end_s, bytes, cover_key, version from clips where job_id in (${jobs.map(() => "?").join(", ")}) order by n`,
+        ...jobs.map((j) => j.id),
+      )
+    : [];
   const proCount = subs.find((s) => s.kind === "pro")?.n ?? 0;
   const packs = subs.find((s) => s.kind === "storage")?.n ?? 0;
   const liteCount = subs.find((s) => s.kind === "lite")?.n ?? 0;
   const mrr = proCount * PRO.price + liteCount * LITE.price + packs * STORAGE_PACK.price;
-  const date = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
   return (
     <>
@@ -113,7 +131,9 @@ export default async function AdminPage() {
                 return (
                   <tr key={u.id} className="odd:bg-canvas">
                     <td className="max-w-[220px] truncate px-4 py-2.5">{u.email}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-muted">{date(u.created_at)}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap text-muted">
+                      <When iso={u.created_at} />
+                    </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{plan}</td>
                     <td className="px-4 py-2.5 tabular-nums">{u.jobs}</td>
                     <td className="px-4 py-2.5 tabular-nums">{u.clips}</td>
@@ -144,20 +164,72 @@ export default async function AdminPage() {
           </table>
         </div>
 
-        <h2 className="mt-10 font-display text-[20px]">Latest videos</h2>
+        <div id="videos" className="mt-10 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 scroll-mt-20">
+          <h2 className="font-display text-[20px]">Videos</h2>
+          <p className="text-[13.5px] text-muted">
+            {t.jobs} in all, newest first{pages > 1 && ` · page ${page} of ${pages}`}
+          </p>
+        </div>
         <div className="card mt-3 overflow-hidden">
           {jobs.length === 0 && <p className="px-4 py-6 text-[14px] text-muted">No videos yet.</p>}
-          {jobs.map((j) => (
-            <div key={j.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13.5px] even:bg-canvas">
-              <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-medium ${j.status === "error" ? "bg-danger-soft text-danger" : j.status === "done" ? "bg-sky-soft text-sky" : "bg-warn-soft text-warn-ink"}`}>{j.status}</span>
-              <span className="min-w-0 flex-1 truncate">{j.title || j.url}</span>
-              <span className="text-muted">
-                {j.email} · {j.found} clips · {j.ai_mode === "ours" ? "our AI" : "own key"} · {date(j.created_at)}
-              </span>
-              {j.error && <span className="w-full truncate text-danger">{j.error}</span>}
-            </div>
-          ))}
+          {jobs.map((j) => {
+            const made = clips.filter((c) => c.job_id === j.id);
+            return (
+              <div key={j.id} className="px-4 py-3 text-[13.5px] even:bg-canvas">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-medium ${j.status === "error" ? "bg-danger-soft text-danger" : j.status === "done" ? "bg-sky-soft text-sky" : "bg-warn-soft text-warn-ink"}`}>{j.status}</span>
+                  <a href={j.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">
+                    {j.title || j.url}
+                  </a>
+                  <span className="text-muted">
+                    {j.email} · {j.ai_mode === "ours" ? "our AI" : "own key"} · <When iso={j.created_at} />
+                  </span>
+                </div>
+                {j.error && <p className="mt-1 text-danger">{j.error}</p>}
+                {made.length > 0 && (
+                  <ul className="mt-2 grid gap-1.5">
+                    {made.map((c) => (
+                      <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {c.cover_key ? <img src={`/api/clips/${c.id}/file?part=cover&v=${c.version}`} alt="" loading="lazy" className="h-14 w-8 shrink-0 rounded-md bg-subtle object-cover" /> : <span className="h-14 w-8 shrink-0 rounded-md bg-subtle" />}
+                        <span className="min-w-0 flex-1 truncate">{c.title || "Untitled clip"}</span>
+                        <span className="whitespace-nowrap text-muted tabular-nums">
+                          {Math.round(c.end_s - c.start_s)} sec · {formatBytes(c.bytes)}
+                        </span>
+                        <a href={`/api/clips/${c.id}/file?v=${c.version}`} target="_blank" rel="noreferrer" className="rounded-lg bg-subtle px-2.5 py-1 whitespace-nowrap hover:bg-line">
+                          Watch
+                        </a>
+                        <DeleteClip id={c.id} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {made.length === 0 && j.found > 0 && <p className="mt-1 text-muted">{j.found} clips made, since deleted.</p>}
+              </div>
+            );
+          })}
         </div>
+        {pages > 1 && (
+          <nav className="mt-3 flex items-center justify-between text-[13.5px]" aria-label="Pages of videos">
+            {page > 1 ? (
+              <Link href={`/admin?page=${page - 1}#videos`} className="btn-quiet">
+                Newer
+              </Link>
+            ) : (
+              <span />
+            )}
+            <span className="text-muted tabular-nums">
+              Page {page} of {pages}
+            </span>
+            {page < pages ? (
+              <Link href={`/admin?page=${page + 1}#videos`} className="btn-quiet">
+                Older
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )}
 
         <h2 className="mt-10 font-display text-[20px]">Payments</h2>
         <div className="card mt-3 overflow-hidden">
@@ -167,7 +239,7 @@ export default async function AdminPage() {
               <span className="font-medium">{e.event}</span>
               <span className="min-w-0 flex-1 truncate text-ink-2">{e.detail}</span>
               <span className="text-muted">
-                {e.email ?? "unknown"} · {date(e.at)}
+                {e.email ?? "unknown"} · <When iso={e.at} />
               </span>
             </div>
           ))}

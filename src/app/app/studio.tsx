@@ -121,7 +121,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
                 ))}
             </div>
           </Choice>
-          <Choice label="Longest clip">
+          <Choice label="Clip length, up to">
             <div className="seg">
               {[30, 60, 90].map((n) => (
                 <button key={n} type="button" aria-pressed={maxLen === n} onClick={() => setMaxLen(n)}>
