@@ -606,6 +606,7 @@ def make(spec, web, work):
             job.update(status="error", error=explain(e, signed_in) or safe.friendly(e), stage="Stopped")
 
     sent, last, full = set(), None, False
+    told = [0.0]        # when the website last heard from this video
     worker = threading.Thread(target=run, daemon=True)
     worker.start()
 
@@ -678,10 +679,12 @@ def make(spec, web, work):
             # Whether the streamer's webcam was found: None until it has been looked for.
             "facecam": (bool(looked.get("box")) if looked.get("done") else None) if asked_cam else None,
         }
-        if final or body != last:
+        # The website closes a video it hasn't heard from in 15 minutes, as one that has crashed. A slow AI
+        # service can keep one step going that long with nothing new to say, so it hears from us every minute.
+        if final or body != last or time.time() - told[0] > 60:
             if tell(body) == 410:                     # the job was deleted on the website: stop working on it
                 os._exit(0)
-            last = body
+            last, told[0] = body, time.time()
 
     while worker.is_alive():
         report()
