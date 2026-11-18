@@ -52,7 +52,7 @@ export function KeyForm({ saved: initial }: { saved: Saved }) {
     if (!res?.ok) return setMessage({ ok: false, text: j?.error || "Couldn't save the key. Please try again." });
     setSaved(j.key);
     setKey("");
-    setMessage({ ok: true, text: j.checked ? "Saved. The key works." : "Saved. The service couldn't be reached to check it, so your first video will tell." });
+    setMessage({ ok: true, text: j.checked ? "Saved. The key and the model both work." : "Saved. The service couldn't be reached to check it, so your first video will tell." });
   };
 
   return (

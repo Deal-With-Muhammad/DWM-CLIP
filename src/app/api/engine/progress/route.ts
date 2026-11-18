@@ -17,10 +17,27 @@ export async function POST(req: Request) {
   const at = nowIso();
   const failed = Array.isArray(b.failed) ? b.failed.length : 0;
   let note = text(b.note, 300);
-  if (b.facecam === false && status !== "error") note = "This video has no streamer webcam, so the game fills the screen.";
+  // The AI gave no answer: say so, with the service's own reason, in words about this site (the engine's name
+  // things only its own dashboard has). This matters more than the note about the webcam, so it is kept.
+  const noAi = note.includes("The AI was unavailable") || (typeof b.ai_error === "string" && b.ai_error !== "");
+  if (noAi) {
+    let why = text(b.ai_error, 240)
+      .replace(/^The AI did not answer:\s*/, "")
+      .replace(/PeakCut/g, "DWM Clip")
+      .replace(/Open Settings, AI, press Find models and pick one from the list\./, "Choose another model in Settings.")
+      .replace(/Paste a working key under Settings, AI\./, "Paste a working key in Settings.");
+    if (/^HTTP \d/.test(why)) why = "";
+    // What the service itself replied (which model, which limit), after our own sentence.
+    const tried = (Array.isArray(b.ai_said) ? b.ai_said : []) as { model?: unknown; error?: unknown }[];
+    const message = (raw: unknown) => {
+      const s = text(raw, 400);
+      return ((s.match(/"message":\s*"((?:[^"\\]|\\.){4,170})/)?.[1] ?? s.replace(/^HTTP \d+\s*/, "").slice(0, 170)).replace(/\\n/g, " ").replace(/\\"/g, '"')).trim();
+    };
+    const said = tried.length ? ` ${text(tried[0].model, 60)}: ${message(tried[0].error)}` : "";
+    note = `The AI didn't answer, so the loudest moments were picked, without headings or titles. ${said ? `The service said about${said}` : why || "Check your AI key and model in Settings."}`.slice(0, 480);
+    console.error("ai gave no answer", id, JSON.stringify(tried).slice(0, 1500));
+  } else if (b.facecam === false && status !== "error") note = "This video has no streamer webcam, so the game fills the screen.";
   if (b.storage_full === true) note = "Your storage filled up, so the rest of the clips weren't saved.";
-  // The engine's wording for a missing or refused AI key names nothing the member knows.
-  note = note.replace("The AI was unavailable, so clips were picked by loudness only.", "The AI couldn't be reached, so the loudest moments were picked and they have no titles. Check your AI key in Settings.");
   let error = status === "error" ? text(b.error, 500) || "Something went wrong with this video." : null;
   // The engine's messages name the tool it's built on; members only know this site.
   if (error) error = error.replace(/PeakCut/g, "DWM Clip").replace(/Upload the video file instead, or use a/, "Try a");

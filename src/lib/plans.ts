@@ -56,8 +56,8 @@ export const fromEngineLayout = (l: string) => (l === "gameplay" ? "auto" : l ==
 // The AI services a member can bring a key for. `model` is a sensible default they can change; `models` are a
 // few to choose from until the service's own list has been fetched with their key (see api/keys/models).
 export const PROVIDERS = [
-  { id: "gemini", label: "Google Gemini", model: "gemini-2.5-flash", models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"], keyUrl: "https://aistudio.google.com/apikey", free: true },
-  { id: "openrouter", label: "OpenRouter", model: "google/gemini-2.5-flash", models: ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct"], keyUrl: "https://openrouter.ai/keys", free: true },
+  { id: "gemini", label: "Google Gemini", model: "gemini-3.5-flash-lite", models: ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"], keyUrl: "https://aistudio.google.com/apikey", free: true },
+  { id: "openrouter", label: "OpenRouter", model: "openrouter/free", models: ["openrouter/free", "google/gemini-3.5-flash-lite", "google/gemini-3.6-flash"], keyUrl: "https://openrouter.ai/keys", free: true },
   { id: "groq", label: "Groq", model: "llama-3.3-70b-versatile", models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"], keyUrl: "https://console.groq.com/keys", free: true },
   { id: "openai", label: "OpenAI", model: "gpt-4o-mini", models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1-nano"], keyUrl: "https://platform.openai.com/api-keys", free: false },
   { id: "xai", label: "Grok (xAI)", model: "grok-4", models: ["grok-4"], keyUrl: "https://console.x.ai", free: false },
@@ -68,3 +68,12 @@ export function formatBytes(n: number) {
   if (n >= GB) return `${(n / GB).toFixed(n >= 10 * GB ? 0 : 1).replace(/\.0$/, "")} GB`;
   return `${Math.round(n / MB)} MB`;
 }
+
+// Gemini models Google has retired: a key made today can't use them, and from 1 December 2026 Google itself
+// sends requests for them to the newer model named here. Members who saved one are moved the same way.
+export const RETIRED_MODELS: Record<string, string> = {
+  "gemini-2.5-flash": "gemini-3.5-flash-lite",
+  "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",
+  "gemini-2.0-flash": "gemini-3.5-flash-lite",
+  "gemini-2.5-pro": "gemini-3.8-flash",
+};

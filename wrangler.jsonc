@@ -16,7 +16,7 @@
     "SMTP_FROM": "me@dealwithmuhammad.com",
     // "Our AI" for Pro: the cheapest model that still picks good moments.
     "AI_PROVIDER": "gemini",
-    "AI_MODEL": "gemini-3.5-flash-lite,gemini-2.5-flash-lite",
+    "AI_MODEL": "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash",
     // Which service takes payments: "lemonsqueezy" now, "paddle" once Paddle has approved the site.
     "PAYMENTS": "lemonsqueezy",
     // Lemon Squeezy (store "DWM Invite"): each product's checkout link and id. Not secret.

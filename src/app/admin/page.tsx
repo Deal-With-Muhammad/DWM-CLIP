@@ -7,7 +7,7 @@ import { accountOf } from "@/lib/server/account";
 import { all, first } from "@/lib/server/db";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
-import { setBonus, setPlan } from "./actions";
+import { setBonus, setPlan, testOurAi } from "./actions";
 import { DeleteClip } from "./delete-clip";
 import { When } from "./when";
 
@@ -32,23 +32,26 @@ function fill(rows: Day[]) {
 /** The time this many days ago, as the database stores it. */
 const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ page?: string; ai?: string }> }) {
   const user = await currentUser();
   if (!user) redirect("/login?next=/admin");
   if (!isAdminEmail(user.email)) notFound();
 
-  const asked = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
+  const query = await searchParams;
+  const asked = Math.max(1, Math.floor(Number(query.page)) || 1);
+  const aiTest = typeof query.ai === "string" ? query.ai.slice(0, 700) : "";
   const since = ago(DAYS);
   const week = ago(7);
   const now = ago(0);
   const [account, totals, subs, signups, clipDays, jobDays, users, jobs, events] = await Promise.all([
     accountOf(user),
-    first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; tokens: number; active7: number }>(
+    first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; tokens: number; active7: number; done: number; aiOk: number }>(
       `select (select count(*) from users) as users, (select count(*) from users where created_at > ?1) as users7,
         (select count(*) from jobs) as jobs, (select count(*) from jobs where status = 'error') as failed,
         (select coalesce(sum(clips), 0) from usage) as clips, (select coalesce(sum(bytes), 0) from clips) as bytes,
         (select coalesce(sum(tokens), 0) from jobs where ai_mode = 'ours') as tokens,
-        (select count(distinct user_id) from jobs where created_at > ?1) as active7`,
+        (select count(distinct user_id) from jobs where created_at > ?1) as active7,
+        (select count(*) from jobs where status = 'done') as done, (select count(*) from jobs where status = 'done' and tokens > 0) as aiOk`,
       week,
     ),
     all<{ kind: string; n: number }>(
@@ -68,8 +71,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
        from users u order by u.created_at desc limit 100`,
       now,
     ),
-    all<{ id: string; email: string; title: string; url: string; status: string; error: string | null; ai_mode: string; found: number; created_at: string }>(
-      "select j.id, u.email, j.title, j.url, j.status, j.error, j.ai_mode, j.found, j.created_at from jobs j join users u on u.id = j.user_id order by j.created_at desc limit ? offset ?",
+    all<{ id: string; email: string; title: string; url: string; status: string; error: string | null; note: string | null; ai_mode: string; found: number; created_at: string }>(
+      "select j.id, u.email, j.title, j.url, j.status, j.error, j.note, j.ai_mode, j.found, j.created_at from jobs j join users u on u.id = j.user_id order by j.created_at desc limit ? offset ?",
       PER_PAGE,
       (asked - 1) * PER_PAGE,
     ),
@@ -104,8 +107,29 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Tile label="Active this week" value={t.active7} sub="members who clipped a video" />
           <Tile label="Clips made" value={t.clips} sub={`${t.jobs} video${t.jobs === 1 ? "" : "s"}, ${t.failed} failed`} />
           <Tile label="Storage in use" value={formatBytes(t.bytes)} sub={`about $${((t.bytes / 1024 ** 3) * 0.015).toFixed(2)}/month on R2`} />
-          <Tile label="Our AI tokens" value={t.tokens.toLocaleString("en-US")} sub="used for Pro members" />
+          <Tile label="Our AI tokens" value={t.tokens.toLocaleString("en-US")} sub="used for Lite and Pro members" />
+          <Tile label="AI picked the moments" value={`${t.aiOk} of ${t.done}`} sub="finished videos; the rest fell back to the loudest moments" />
+          <div id="ai" className="card scroll-mt-20 px-4 py-3.5">
+            <p className="text-[13px] text-muted">Our AI (Lite and Pro)</p>
+            <form action={testOurAi} className="mt-2">
+              <button className="rounded-lg bg-subtle px-2.5 py-1 text-[13.5px] hover:bg-line">Test it now</button>
+            </form>
+            <p className="mt-1.5 text-[12.5px] leading-snug text-muted">{aiTest ? "" : "Asks each model one tiny question."}</p>
+          </div>
         </section>
+
+        {aiTest && (
+          <div className="card mt-3 px-4 py-3.5 text-[13.5px]">
+            <p className="font-medium">Our AI, tested just now</p>
+            <ul className="mt-1.5 grid gap-1">
+              {aiTest.split(" | ").map((line) => (
+                <li key={line} className={/: works$/.test(line) ? "text-ink-2" : "text-danger"}>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <section className="mt-4 grid gap-3 lg:grid-cols-3">
           <Chart title="New members" days={fill(signups)} />
@@ -186,6 +210,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   </span>
                 </div>
                 {j.error && <p className="mt-1 text-danger">{j.error}</p>}
+                {j.note && <p className={`mt-1 ${j.note.startsWith("The AI") ? "text-warn-ink" : "text-muted"}`}>{j.note}</p>}
                 {made.length > 0 && (
                   <ul className="mt-2 grid gap-1.5">
                     {made.map((c) => (

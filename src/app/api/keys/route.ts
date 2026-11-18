@@ -4,6 +4,7 @@ import { PROVIDERS } from "@/lib/plans";
 import { hit } from "@/lib/server/auth-helpers";
 import { fail } from "@/lib/server/http";
 import { isProvider, keyInfo, removeKey, saveKey } from "@/lib/server/keys";
+import { modelWorks } from "@/lib/server/ai-check";
 import { currentUser } from "@/lib/server/session";
 
 export async function GET() {
@@ -47,8 +48,11 @@ export async function PUT(req: Request) {
   const model = typeof body.model === "string" && /^[\w.:\/-]{2,80}$/.test(body.model.trim()) ? body.model.trim() : fallback;
   const works = await keyWorks(body.provider, key);
   if (works === false) return fail(400, "That service didn't accept the key. Check it and paste it again.");
+  const label = PROVIDERS.find((p) => p.id === body.provider)!.label;
+  const answers = works === true ? await modelWorks(body.provider, model, key) : null;
+  if (answers && !answers.ok) return fail(400, `${label} accepted the key, but the model "${model}" didn't answer: ${answers.why}. Choose another model from the list.`);
   await saveKey(user.id, body.provider, model, key);
-  return NextResponse.json({ ok: true, checked: works === true, key: await keyInfo(user.id) });
+  return NextResponse.json({ ok: true, checked: answers?.ok === true, key: await keyInfo(user.id) });
 }
 
 export async function DELETE() {

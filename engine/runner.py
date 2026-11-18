@@ -157,11 +157,55 @@ def send(web, job_id: str, clip_id: str, part: str, body, kind: str, head: dict,
     return 0
 
 
-def clip_head(clip: dict, look=None) -> dict:
+def clip_head(clip: dict, look=None, video_title="") -> dict:
     meta = {k: clip.get(k) for k in ("title", "hook", "description", "hashtags", "score", "category", "start", "end", "layout", "style")}
+    meta["title"] = meta["title"] or str(video_title or "")[:90]      # a clip the AI didn't name is called after its video
     meta["captions"] = bool(clip.get("captions", True))
     meta["look"] = look if isinstance(look, dict) else None
     return {"x-clip-meta": base64.urlsafe_b64encode(json.dumps(meta).encode()).decode()}
+
+
+def ai_error(job) -> str:
+    """Why the AI gave no answer for this video, in the service's own words, or "" when it answered."""
+    ai = job.get("ai") or {}
+    if ai.get("model"):
+        return ""
+    for line in reversed(ai.get("log") or []):
+        if "AI window" in str(line) and "failed:" in str(line):
+            return str(line).split("failed:", 1)[1].strip()[:240]
+    return ""
+
+
+AI_SAID = {}
+
+
+def keep_ai_reason(ai):
+    """The engine turns a refused AI call into a sentence about its own dashboard and drops what the service
+    said. That reply (which model, which limit) is what tells a member, or us, what to change, so it is kept."""
+    call = ai.call
+
+    def kept(model, *a, **k):
+        try:
+            return call(model, *a, **k)
+        except Exception as e:  # noqa: BLE001 - noted, then left to the engine as before
+            AI_SAID.setdefault(str(model), str(e)[:400])     # the first reply for each model tried
+            raise
+
+    ai.call = kept
+
+
+def no_stamp(brain):
+    """With no answer from the AI the engine takes the loudest moments and puts "WAIT FOR IT" on every one of
+    them, titled "Loud moment". The same heading on every clip is worse than none: these go out without one."""
+    loudest = brain.fallback_by_loudness
+
+    def plain(*a, **k):
+        picks = loudest(*a, **k)
+        for p in picks:
+            p["hook"], p["title"] = "", ""
+        return picks
+
+    brain.fallback_by_loudness = plain
 
 
 # ---------------------------------------------------------------------------------------------- a whole video
@@ -175,6 +219,10 @@ def make(spec, web, work):
 
     try:
         from studio import auth, brain, ctx, db, facecam, jobs, media, render, safe
+
+        no_stamp(brain)
+        from studio import ai as ai_service
+        keep_ai_reason(ai_service)
 
         db.init()
         user = auth.local_user()
@@ -304,7 +352,7 @@ def make(spec, web, work):
     def upload(clip) -> bool:
         """One finished clip: the cover picture, what is needed to remake it, then the video. False once storage is full."""
         folder = Path(job["dir"]) / "clips"
-        head = clip_head(clip, spec.get("look"))
+        head = clip_head(clip, spec.get("look"), job.get("title"))
         cover, video = folder / str(clip.get("cover")), folder / str(clip.get("file"))
         if not (clip.get("file") and video.is_file()):
             return True
@@ -334,6 +382,9 @@ def make(spec, web, work):
             "game": job.get("game") or "", "error": job.get("error"),
             "model": (job.get("ai") or {}).get("model"), "tokens": (job.get("ai") or {}).get("tokens", 0),
             "note": (job.get("ai") or {}).get("note") or "",
+            "ai_error": ai_error(job),
+            # Each model tried and what the service replied, the member's own choice first.
+            "ai_said": [{"model": m, "error": e} for m, e in AI_SAID.items()][:4] if not (job.get("ai") or {}).get("model") else [],
             "failed": [{"id": c["id"], "error": c.get("error") or ""} for c in job["clips"] if c.get("status") == "error"],
             "found": len(job["clips"]), "storage_full": full,
             # Whether the streamer's webcam was found: None until it has been looked for.

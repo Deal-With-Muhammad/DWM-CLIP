@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { cleanLook } from "@/lib/look";
-import { ENGINE_LAYOUT, LAYOUTS, SITES, STYLES } from "@/lib/plans";
+import { ENGINE_LAYOUT, LAYOUTS, RETIRED_MODELS, SITES, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
 import { engineReady, startJob } from "@/lib/server/engine";
@@ -69,6 +69,11 @@ export async function POST(req: Request) {
     const key = setting("AI_KEY");
     if (!key) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
     ai = { provider: setting("AI_PROVIDER") || "gemini", model: setting("AI_MODEL") || "gemini-2.5-flash-lite", key };
+  }
+  // A member's own Gemini key: a retired model is swapped for the one Google replaced it with, and the small
+  // current model is kept as a second try, so one model that won't answer doesn't leave the clips without the AI.
+  if (useOwn && ai.provider === "gemini") {
+    ai = { ...ai, model: [...new Set([RETIRED_MODELS[ai.model], ai.model, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter(Boolean))].join(",") };
   }
   if (!engineReady()) return fail(503, "Clipping isn't switched on yet. Please try again soon.");
 
