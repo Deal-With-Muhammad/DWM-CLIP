@@ -3,10 +3,27 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { connect } from "node:tls";
 
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+
 import { setting } from "@/lib/server/settings";
 
-// Sign-in codes and notifications go out over SMTP (a Gmail app password works),
-// from the same address as the rest of the DWM sites.
+// Sign-in codes and notifications go out through Cloudflare Email Service (the `EMAIL` binding in
+// wrangler.jsonc; dealwithmuhammad.com is onboarded under Email Service → Email Sending). SMTP is
+// only a fallback for a host without the binding: Gmail's daily sending limit once stopped every
+// sign-in code across the DWM sites.
+
+type EmailBinding = {
+  send(message: { from: string | { email: string; name: string }; to: string; subject: string; text: string; html: string }): Promise<{ messageId: string }>;
+};
+
+function emailBinding(): EmailBinding | null {
+  try {
+    const b = (getCloudflareContext().env as unknown as Record<string, unknown>).EMAIL;
+    return b && typeof (b as EmailBinding).send === "function" ? (b as EmailBinding) : null;
+  } catch {
+    return null;
+  }
+}
 
 const page = (code: string, link: string) => `<div style="font-family:system-ui,sans-serif;max-width:440px;margin:0 auto;padding:32px 24px;background:#f6f7f7;color:#14201e">
   <p style="font-size:15px;color:#0e9384;margin:0">DWM Clip</p>
@@ -26,6 +43,18 @@ const encodeSubject = (t: string) => {
 };
 
 export async function sendMail({ to, subject, text, html }: { to: string; subject: string; text: string; html?: string }) {
+  const body = html ?? `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;white-space:pre-wrap">${escapeHtml(text)}</div>`;
+  const binding = process.env.NODE_ENV === "production" ? emailBinding() : null;
+  if (binding) {
+    await binding.send({
+      from: { email: setting("SMTP_FROM") || "me@dealwithmuhammad.com", name: "DWM Clip" },
+      to,
+      subject: subject.replace(/[\r\n]+/g, " ").slice(0, 150),
+      text,
+      html: body,
+    });
+    return;
+  }
   const user = setting("SMTP_USER");
   const pass = setting("SMTP_PASS");
   if (!user || !pass) {
@@ -46,7 +75,7 @@ export async function sendMail({ to, subject, text, html }: { to: string; subjec
     "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",
-    part("text/plain", text) + part("text/html", html ?? `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;white-space:pre-wrap">${escapeHtml(text)}</div>`) + `--${boundary}--`,
+    part("text/plain", text) + part("text/html", body) + `--${boundary}--`,
     ".",
   ].join("\r\n");
   await smtp(host, [
