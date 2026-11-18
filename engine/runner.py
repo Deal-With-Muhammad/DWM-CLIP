@@ -97,7 +97,14 @@ def explain(e, signed_in=False):
         return "YouTube refused to give this video to our server just now. Try again in a few minutes, or use a Twitch or Kick link."
     if re.search(r"is a live stream|live event will begin|Premieres in|is offline", s, re.I):
         return "This stream is still live, or hasn't started. Paste the link again once it has ended."
-    if re.search(r"Private video|members.only|Join this channel|Video unavailable|has been removed|not available in your country", s, re.I):
+    # The engine's own wording points at an "Options" setting the website doesn't have.
+    too_long = re.search(r"longer than ([\d.]+) hours", s)
+    if too_long:
+        hours = float(too_long.group(1))
+        limit = f"{hours:g} hour" + ("" if hours == 1 else "s")
+        return (f"This video is longer than {limit}, the most your plan takes. Try a shorter video, or move up a plan for longer ones." if hours < 3
+                else f"This video is longer than {limit}, which is the limit. Try a shorter one.")
+    if re.search(r"Private video|members.only|Join this channel|Video unavailable|video is not available|has been removed|not available in your country", s, re.I):
         return "This video is private, members-only, removed or blocked in some countries, so it can't be fetched."
     if re.search(r"\b403\b|Forbidden", s):
         return "The video site refused the download. Please try again in a few minutes."
