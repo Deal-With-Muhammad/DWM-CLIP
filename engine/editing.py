@@ -7,6 +7,8 @@ last. Here a clip is treated the way a person editing it would:
   moments of the clip ("beats"), so the text on screen follows what is happening.
 - Stretches where nobody speaks and nothing loud happens are cut out, and every other piece is moved in a
   little closer, so a cut looks meant.
+- In the "follow" layout the streamer is cut out and shown above the game, and the cut-out follows their head
+  (follow.py finds and follows the face; here it is fitted into the clip).
 
 `install(render, brain)` puts this in place for one job. PeakCut's own files are not changed.
 """
@@ -14,8 +16,11 @@ import re
 import shutil
 import subprocess
 import threading
+import traceback
 
 import numpy as np
+
+import follow
 
 HOOK_SECONDS = 4.5       # how long the opening heading stays
 BEAT_SECONDS = 3.2       # how long a later heading stays
@@ -26,7 +31,7 @@ LOUDER_BY = 5.0          # dB above the usual sound between words: louder than t
 MOST = 0.4               # never more than this share of a clip is cut out
 ZOOM = 1.06              # how far every other piece moves in
 
-NOW = threading.local()  # what the clip being drawn in this thread needs: its later headings and its cuts
+NOW = threading.local()  # what the clip being drawn in this thread needs: its later headings, its cuts, how it follows the streamer
 SHORTEST = [0.0]         # the shortest a clip may end up, in seconds (the member's chosen length band)
 
 BEATS_RULE = """- beats: the hook leaves the screen after about four seconds. Give one to three more headings for later in the
@@ -224,38 +229,77 @@ def _cut_render(render, config):
     render._render_in = render_in
 
 
-def _edit(render):
+def _edit(render, config):
     draw = render.render_clip
 
     def render_clip(src, out_dir, name, clip, words, src_w, src_h):
         start, end = clip["start"], clip["end"]
         span = end - start
         beats = [(float(b["t"]), str(b["text"])) for b in clip.get("beats") or [] if isinstance(b, dict) and "t" in b]
+        asked = clip.get("layout") == "follow" and src_w > src_h      # a video that is already tall has nothing to cut out
         cuts = []
         if clip.get("tighten"):
             try:
                 cuts = quiet_parts(src, start, end, words, max(SHORTEST[0], 5.0, span * (1 - MOST)))
             except Exception:  # noqa: BLE001 - a clip without cuts is still a clip
                 cuts = []
-        NOW.cut = None
+        way = None
+        if asked:
+            # The streamer is looked for in this clip. If they aren't in it, the clip is made the ordinary way
+            # (the picture fills the screen) and marked as such, so the member is told and nothing is pretended.
+            try:
+                way = follow.plan(src, start, end, src_w, src_h, clip.get("streamer"))
+            except Exception:  # noqa: BLE001 - a clip that doesn't follow is still a clip
+                traceback.print_exc()
+            if not way:
+                clip = dict(clip, layout="crop")
+        NOW.cut, NOW.follow = None, None
+        pieces = None
         if cuts:
             move = _mover(cuts)
             pieces = _pieces(span, cuts)
             words = [dict(w, s=start + move(w["s"] - start), e=start + move(w["e"] - start)) for w in words if start - 0.05 <= w["s"] < end]
             beats = [(move(t), text) for t, text in beats]
             clip = dict(clip, end=round(start + sum(b - a for a, b in pieces), 2))
-            # Moving in on every other piece needs an even picture and no webcam cut out of it by position.
-            zoom = not (clip.get("layout") == "gameplay" and clip.get("facecam")) and src_w % 2 == 0 and src_h % 2 == 0
+            # Moving in on every other piece needs an even picture and nothing cut out of it by position.
+            zoom = not way and not (clip.get("layout") == "gameplay" and clip.get("facecam")) and src_w % 2 == 0 and src_h % 2 == 0
             NOW.cut = {"pieces": pieces, "span": span, "zoom": zoom, "w": src_w, "h": src_h}
+        if way:
+            NOW.follow = {"solo": way["solo"], "filter": follow.graph(way, config.OUT_FPS, pieces)}
         NOW.beats = beats
         try:
             out = draw(src, out_dir, name, clip, words, src_w, src_h)
         finally:
-            NOW.cut, NOW.beats = None, []
+            NOW.cut, NOW.beats, NOW.follow = None, [], None
         out["cut"] = round(sum(b - a for a, b in cuts), 2)       # seconds taken out, for the record
+        if asked:
+            # Whether the streamer was followed in this clip, and where they sit (kept, so a change to the clip
+            # later follows the same person).
+            out["followed"], out["streamer"] = bool(way), way["spot"] if way else None
         return out
 
     render.render_clip = render_clip
+
+
+def _follow(render):
+    """The "follow" layout: where the heading and captions go, and the filter that draws it."""
+    render.LAYOUTS["follow"] = "The streamer above the game, following their head"
+    where, lay = render.geometry, render._filter
+
+    def geometry(src_w, src_h, layout):
+        way = getattr(NOW, "follow", None)
+        if layout != "follow" or not way:
+            return where(src_w, src_h, "crop" if layout == "follow" else layout)
+        # Two panels: the heading sits on the line where they meet. One panel: the same places as a full picture.
+        return "follow", render.H, (300 if way["solo"] else follow.TOP_H), 1380
+
+    def _filter(layout, fg_h, facecam=None):
+        way = getattr(NOW, "follow", None)
+        if layout == "follow":
+            return way["filter"] if way else lay("crop", fg_h, None)
+        return lay(layout, fg_h, facecam)
+
+    render.geometry, render._filter = geometry, _filter
 
 
 def install(render, brain=None, roman=None, config=None):
@@ -263,8 +307,9 @@ def install(render, brain=None, roman=None, config=None):
     if config is None:
         from studio import config
     _headings(render)
+    _follow(render)
     _cut_render(render, config)
-    _edit(render)
+    _edit(render, config)
     if brain is not None:
         if roman is None:
             from studio import roman

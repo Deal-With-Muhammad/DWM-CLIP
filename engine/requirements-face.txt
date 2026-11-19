@@ -1,0 +1,3 @@
+# Finding the streamer's face for the "follow" layout (engine/follow.py). Kept apart from requirements.txt so the
+# engine's image installs it after the speech model, and adding it didn't mean fetching that model again.
+opencv-python-headless==4.13.0.92

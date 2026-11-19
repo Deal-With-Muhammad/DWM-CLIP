@@ -270,13 +270,17 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           <Choice label="Captions">
             <CaptionChoice style={style} captions={captions} look={look} onStyle={setStyle} onCaptions={setCaptions} onLook={setLook} />
           </Choice>
-          <Choice label="Layout" hint={hint}>
+          <Choice label="Layout">
             <div className="seg">
               {LAYOUTS.map((l) => (
                 <button key={l.id} type="button" aria-pressed={layout === l.id} onClick={() => setLayout(l.id)}>
                   {l.label}
                 </button>
               ))}
+            </div>
+            <div className="mt-2 flex items-center gap-3">
+              <LayoutPicture id={layout} />
+              <p className="text-[12.5px] leading-snug text-muted">{hint}</p>
             </div>
           </Choice>
           <Choice label="Quiet parts" hint={tighten ? "Pauses where nobody talks and nothing happens are cut out, so the clip moves faster." : "Each clip is one unbroken piece of the video."}>
@@ -435,6 +439,32 @@ function Choice({ label, hint, children }: { label: string; hint?: string; child
       {children}
       {hint && <p className="mt-1.5 text-[12.5px] leading-snug text-muted">{hint}</p>}
     </div>
+  );
+}
+
+/** A small drawing of the tall clip, showing where the game and the streamer go in the chosen layout. */
+function LayoutPicture({ id }: { id: string }) {
+  const game = "absolute inset-x-0 bg-violet";
+  const face = (size: string) => <span className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ${size}`} />;
+  return (
+    <span aria-hidden className="relative block h-[64px] w-[36px] shrink-0 overflow-hidden rounded-md bg-subtle">
+      {id === "follow" ? (
+        <>
+          <span className="absolute inset-x-0 top-0 h-[21px] bg-pink">{face("size-[9px]")}</span>
+          <span className={`${game} top-[22px] bottom-0`} />
+        </>
+      ) : id === "blur" ? (
+        <>
+          <span className="absolute inset-0 bg-violet-soft" />
+          <span className={`${game} top-[22px] h-[20px]`} />
+        </>
+      ) : (
+        <>
+          <span className={`${game} inset-y-0`} />
+          {id === "auto" && <span className="absolute end-[3px] top-[3px] h-[10px] w-[14px] rounded-[2px] bg-pink">{face("size-[5px]")}</span>}
+        </>
+      )}
+    </span>
   );
 }
 

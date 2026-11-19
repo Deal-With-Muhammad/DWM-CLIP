@@ -18,8 +18,14 @@ ENV PEAKCUT_MODELS=/app/models \
     PYTHONUNBUFFERED=1
 RUN PEAKCUT_DATA=/tmp/build python -c "from studio import fetch_model; fetch_model.ensure()" && rm -rf /tmp/build
 
+# Finding the streamer's face (follow.py). Installed here and not with the rest above, so that adding it
+# didn't mean fetching the speech model again.
+COPY requirements-face.txt .
+RUN pip install --no-cache-dir -r requirements-face.txt
+
 # Our own files come after the model, so changing them doesn't download it again.
-COPY runner.py editing.py live_source.py server.py PEAKCUT-LICENSE ./
+COPY runner.py editing.py follow.py live_source.py server.py PEAKCUT-LICENSE ./
+COPY face face
 
 ENV PORT=8080 \
     ENGINE_ONE_SHOT=1 \

@@ -13,6 +13,7 @@ Live at https://clip.dealwithmuhammad.com.
 | `engine/` | The clip engine (Python): fetches the video, finds the moments, renders the clips |
 | `engine/studio/` | [PeakCut](https://github.com/haziqahmedqasmi/PeakCut) at commit `1bef2b4`, unchanged (MIT, see `engine/PEAKCUT-LICENSE`) |
 | `engine/runner.py`, `engine/server.py` | Ours: run one job with PeakCut's pipeline and report back to the website |
+| `engine/editing.py`, `engine/follow.py` | Ours: headings that change, quiet parts cut out, and the layout that follows the streamer's head (face model in `engine/face/`) |
 | `engine/cloudflare/` | The engine as a Cloudflare Container (one per video) |
 
 The website starts a job on the engine (`ENGINE_URL`), and the engine sends progress and finished clips back to
@@ -39,7 +40,7 @@ npm run db:local
 npm run dev
 ```
 
-In a second terminal, the engine (first time: `cd engine && python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt`; needs `ffmpeg`):
+In a second terminal, the engine (first time: `cd engine && python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt -r requirements-face.txt`; needs `ffmpeg`):
 
 ```bash
 npm run engine

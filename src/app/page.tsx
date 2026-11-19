@@ -36,6 +36,7 @@ const FAQ = [
   },
   { q: "How long does it take?", a: "A 20-minute video takes about three minutes. Clips appear one by one as they finish, so you can start posting before the whole video is done." },
   { q: "What if the video has no facecam?", a: "Then the game fills the screen, and the page tells you so. Nothing is made up: the webcam is only shown when the video really has one." },
+  { q: "Can the clip follow the streamer?", a: "Yes. Pick Follow streamer before you make the clips: the streamer is cut out and shown above the game, and the picture moves with their head when they lean or jump up. A clip with no face in it is made the usual way, and you're told." },
   { q: "Can I change a clip I don't like?", a: "Yes. Open it, press Edit, and change the hook, the caption style, the layout or where it starts and ends. Changing a clip doesn't use up one of your clips." },
   { q: "Is it only for GTA 6?", a: "No. It knows GTA VI and 20 other games by name, so titles and hashtags fit the game, but it works on any video where something happens or someone talks." },
   { q: "What happens when my storage is full?", a: "New clips aren't saved until you delete some or add storage. Download the clips you want to keep, delete them here, and the space is yours again." },

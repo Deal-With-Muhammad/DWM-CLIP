@@ -44,16 +44,18 @@ export const STYLES = [
 ] as const;
 
 // How the wide video is fitted into the tall clip. "auto" keeps the streamer's webcam in the corner
-// when the video has one, and simply fills the screen when it doesn't.
+// when the video has one, and simply fills the screen when it doesn't. "follow" finds the streamer's face,
+// cuts them out and shows them above the game, moving with their head; a clip they aren't in fills the screen.
 export const LAYOUTS = [
   { id: "auto", label: "Auto", hint: "Fills the screen, and keeps the streamer's webcam in the corner if the video has one." },
+  { id: "follow", label: "Follow streamer", hint: "The streamer is cut out and shown above the game, and the picture moves with their head. A clip with no face in it fills the screen instead." },
   { id: "crop", label: "Fill screen", hint: "The middle of the video fills the whole clip." },
   { id: "blur", label: "Whole frame", hint: "The whole wide picture, with soft blurred edges above and below." },
 ] as const;
 
 /** The engine's own names for the layouts above. */
-export const ENGINE_LAYOUT: Record<string, string> = { auto: "gameplay", crop: "crop", blur: "blur" };
-export const fromEngineLayout = (l: string) => (l === "gameplay" ? "auto" : l === "blur" || l === "zoom" ? "blur" : "crop");
+export const ENGINE_LAYOUT: Record<string, string> = { auto: "gameplay", follow: "follow", crop: "crop", blur: "blur" };
+export const fromEngineLayout = (l: string) => (l === "gameplay" ? "auto" : l === "follow" ? "follow" : l === "blur" || l === "zoom" ? "blur" : "crop");
 
 // The AI services a member can bring a key for. `model` is a sensible default they can change; `models` are a
 // few to choose from until the service's own list has been fetched with their key (see api/keys/models).

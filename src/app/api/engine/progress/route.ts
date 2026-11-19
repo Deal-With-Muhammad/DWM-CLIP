@@ -24,6 +24,15 @@ export async function POST(req: Request) {
   const made = Math.round(num(b.found)) - failed;
   const plural = (n: number, one: string, many: string) => (n === 1 ? one : many.replace("#", String(n)));
   let note = text(b.note, 300);
+  // "Follow streamer" was asked for, and some clips (or all of them) have no face to follow: they were made
+  // the ordinary way, and the member is told which it was.
+  const lost = Math.round(num(b.not_followed));
+  const noFace =
+    lost > 0 && status !== "error"
+      ? Math.round(num(b.followed)) === 0
+        ? `The streamer's face wasn't found in ${plural(lost, "this clip", "these clips")}, so the picture fills the screen.`
+        : `The streamer's face wasn't found in ${plural(lost, "one clip", "# clips")}, so the picture fills the screen in ${lost === 1 ? "that one" : "those"}.`
+      : "";
   // The AI gave no answer: say so, with the service's own reason, in words about this site (the engine's name
   // things only its own dashboard has). This matters more than the note about the webcam, so it is kept.
   const noAi = note.includes("The AI was unavailable") || (typeof b.ai_error === "string" && b.ai_error !== "");
@@ -42,6 +51,7 @@ export async function POST(req: Request) {
     };
     const said = tried.length ? ` ${text(tried[0].model, 60)}: ${message(tried[0].error)}` : "";
     note = `The AI didn't answer, so the loudest moments were picked, without headings or titles. ${said ? `The service said about${said}` : why || "Check your AI key and model in Settings."}`.slice(0, 480);
+    if (noFace) note += ` ${noFace}`;
     console.error("ai gave no answer", id, JSON.stringify(tried).slice(0, 1500));
   } else {
     const parts: string[] = [];
@@ -57,6 +67,7 @@ export async function POST(req: Request) {
       parts.push(`This video is longer than your plan takes at once, so the clips come from the ${hoursWord(hours)} starting at ${moment(num(b.part_from))}.`);
     }
     if (b.facecam === false && status !== "error") parts.push("There is no streamer webcam in it, so the game fills the screen.");
+    if (noFace) parts.push(noFace);
     const skipped = Math.round(num(b.ai_skipped));
     if (status === "done" && b.quiet === true && made > 0) {
       parts.push(`Nobody talks in this video, so ${plural(made, "the clip is its loudest moment", "the clips are its loudest moments")}.`);

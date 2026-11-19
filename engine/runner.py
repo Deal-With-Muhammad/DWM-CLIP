@@ -24,6 +24,7 @@ from pathlib import Path
 import httpx
 
 import editing
+import follow
 import live_source
 
 HERE = Path(__file__).resolve().parent
@@ -437,11 +438,46 @@ def make(spec, web, work):
             return looked["box"]
 
         jobs._facecam = find_facecam
+        looking = threading.Lock()      # clips are drawn two at a time, and the streamer is looked for once
+
+        def find_streamer(job):
+            """For the "follow" layout: where the streamer sits. Three short pieces from different parts of the
+            video are looked at, and a face that is in the same place in two of them is the streamer; a face in
+            the game is somewhere else every time. None when there is no such face: each clip is then looked
+            at by itself."""
+            with looking:
+                if "streamer" in looked:
+                    return looked["streamer"]
+                looked["streamer"] = None
+                try:
+                    o, d = job["options"], Path(job["dir"])
+                    lo = float(o.get("range_start") or 0)
+                    hi = float(o.get("range_end") or job.get("duration") or 0)
+                    if hi - lo < 60:
+                        return None
+                    seen, shape = [], 16 / 9
+                    for i, part in enumerate((0.3, 0.55, 0.8)):
+                        at = lo + (hi - lo) * part
+                        try:
+                            piece = media.download_section(job["source"]["url"], d / "probe", f"face{i}", at, min(hi, at + 40), 720)
+                            info = media.probe(piece)
+                            shape = info["width"] / max(1, info["height"])
+                            seen.append(follow.survey(piece, info["width"], info["height"], 0, info["duration"]))
+                        except Exception:  # noqa: BLE001 - one piece that can't be fetched doesn't stop the others
+                            traceback.print_exc()
+                    shutil.rmtree(d / "probe", ignore_errors=True)
+                    looked["streamer"] = follow.agree(seen, shape)
+                    print("streamer", spec["id"], looked["streamer"], [[c["spot"], c["share"]] for one in seen for c in one[:2]], flush=True)
+                except Exception:  # noqa: BLE001 - each clip is still looked at by itself
+                    traceback.print_exc()
+                return looked["streamer"]
 
         # The webcam was measured on a small copy of the video; the clip is cut from a bigger one.
         draw = render.render_clip
 
         def render_clip(src, out_dir, name, clip, words, src_w, src_h):
+            if clip.get("layout") == "follow" and src_w > src_h:
+                clip = dict(clip, streamer=find_streamer(job))
             box, dims = clip.get("facecam"), looked.get("dims")
             if box and dims and dims[0]:
                 clip = dict(clip, facecam=[round(v * src_w / dims[0]) for v in box])
@@ -641,7 +677,9 @@ def make(spec, web, work):
                 "fixed_for": [round(span[0] + base, 2), round(span[1] + base, 2), *span[2:]] if span and base else span,
                 # The later headings, when on the stream's clock each one comes in; whether quiet stretches are cut.
                 "beats": [{"at": round(clip["start"] + base + b["t"], 2), "text": b["text"]} for b in clip.get("beats") or []],
-                "tighten": tighten, "live": live["on"], "source": live["url"]}
+                "tighten": tighten, "live": live["on"], "source": live["url"],
+                # The "follow" layout: where the streamer sits, so a change to the clip follows the same person.
+                "streamer": clip.get("streamer")}
         send(web, spec["id"], clip["id"], "data", json.dumps(data).encode(), "application/json", head)
         code = send(web, spec["id"], clip["id"], "video", video, "video/mp4", head)
         for f in (cover, video):
@@ -656,6 +694,7 @@ def make(spec, web, work):
                 if not upload(c):
                     full = True
         asked_cam = (job.get("options") or {}).get("layout") == "gameplay"
+        followed = [c.get("followed") for c in job["clips"] if c.get("status") == "done" and c.get("followed") is not None]
         body = {
             "status": job["status"] if final or job["status"] != "done" else "running",
             "stage": job.get("stage") or "", "progress": round(float(job.get("progress") or 0), 3),
@@ -678,6 +717,8 @@ def make(spec, web, work):
             "found": len(job["clips"]), "storage_full": full,
             # Whether the streamer's webcam was found: None until it has been looked for.
             "facecam": (bool(looked.get("box")) if looked.get("done") else None) if asked_cam else None,
+            # The "follow" layout: the clips the streamer was followed in, and the ones their face wasn't found in.
+            "followed": sum(1 for f in followed if f), "not_followed": sum(1 for f in followed if not f),
         }
         # The website closes a video it hasn't heard from in 15 minutes, as one that has crashed. A slow AI
         # service can keep one step going that long with nothing new to say, so it hears from us every minute.
@@ -755,6 +796,7 @@ def remake(spec, web, work):
         local = {"id": clip["n"], "start": start - want, "end": end - want, "hook": roman.to_roman(str(clip.get("hook") or ""))[:60],
                  "style": clip.get("style") or "bounce", "layout": clip.get("layout") or "crop", "captions": bool(clip.get("captions", True)),
                  "highlight_words": clip.get("highlight_words") or [], "facecam": face,
+                 "streamer": clip.get("streamer") if isinstance(clip.get("streamer"), list) and len(clip["streamer"]) == 4 else None,
                  "beats": beats, "tighten": spec.get("tighten") is True}
         out = render.render_clip(piece, work / "out", clip["n"], local, near, meta["width"], meta["height"])
         shown = dict(clip, id=clip["n"], start=round(start, 2), end=round(end, 2), layout=out["layout"], hook=local["hook"])
@@ -765,6 +807,9 @@ def remake(spec, web, work):
             return done("Your storage is full, so the new version wasn't saved.") or 1
         if not 200 <= code < 300:
             return done("The new version couldn't be saved. Please try again.") or 1
+        if out.get("followed") is False:
+            # Asked to follow the streamer, and they aren't in this clip: it was made, and says what it is.
+            return done("The streamer's face wasn't found in this clip, so the picture fills the screen instead.") or 0
         done()
         return 0
     except Exception as e:  # noqa: BLE001
