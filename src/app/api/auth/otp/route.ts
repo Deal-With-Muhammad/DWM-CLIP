@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { EMAIL_RE, hits, safeNext } from "@/lib/server/auth-helpers";
 import { clientIp, siteOrigin } from "@/lib/server/http";
-import { sendCode } from "@/lib/server/mail";
+import { MailLimitError, sendCode } from "@/lib/server/mail";
 import { issueCode } from "@/lib/server/session";
 
 // Step 1 of signing in: email a 6-digit code (and a sign-in link) to this address.
@@ -29,6 +29,9 @@ export async function POST(req: Request) {
     await sendCode(email, code, `${siteOrigin(req)}/auth/confirm?email=${encodeURIComponent(email)}&token=${link}&next=${encodeURIComponent(next)}`);
   } catch (e) {
     console.error("sign-in email", e);
+    if (e instanceof MailLimitError) {
+      return NextResponse.json({ error: "So many people signed up today that we've run out of sign-in emails for now. Please try again in a few hours. Sorry about that." }, { status: 503 });
+    }
     return NextResponse.json({ error: "Couldn't send the code. Please try again." }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

@@ -8,9 +8,20 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { setting } from "@/lib/server/settings";
 
 // Sign-in codes and notifications go out through Cloudflare Email Service (the `EMAIL` binding in
-// wrangler.jsonc; dealwithmuhammad.com is onboarded under Email Service → Email Sending). SMTP is
-// only a fallback for a host without the binding: Gmail's daily sending limit once stopped every
-// sign-in code across the DWM sites.
+// wrangler.jsonc; dealwithmuhammad.com is onboarded under Email Service → Email Sending). That
+// service gives a new account a small daily quota (200 emails, shared by every DWM site), and on
+// a busy day it runs out: every sign-in then failed. So when Cloudflare refuses an email, the
+// same email goes out through Gmail (SMTP_USER / SMTP_PASS) instead, and the other way round on
+// a host without the binding.
+
+/** Thrown when neither service will take another email for now. */
+export class MailLimitError extends Error {}
+
+/** Cloudflare's "no more today" and Gmail's "550 5.4.5 Daily user sending limit exceeded". */
+const isLimit = (e: unknown) => /LIMIT|QUOTA|5\.4\.5|too many/i.test(`${(e as { code?: string })?.code ?? ""} ${e instanceof Error ? e.message : String(e)}`);
+
+/** After Cloudflare refuses for its quota, skip it for a while instead of asking on every email. */
+let cloudflareFullUntil = 0;
 
 type EmailBinding = {
   send(message: { from: string | { email: string; name: string }; to: string; subject: string; text: string; html: string }): Promise<{ messageId: string }>;
@@ -45,19 +56,29 @@ const encodeSubject = (t: string) => {
 export async function sendMail({ to, subject, text, html }: { to: string; subject: string; text: string; html?: string }) {
   const body = html ?? `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;white-space:pre-wrap">${escapeHtml(text)}</div>`;
   const binding = process.env.NODE_ENV === "production" ? emailBinding() : null;
-  if (binding) {
-    await binding.send({
-      from: { email: setting("SMTP_FROM") || "me@dealwithmuhammad.com", name: "DWM Clip" },
-      to,
-      subject: subject.replace(/[\r\n]+/g, " ").slice(0, 150),
-      text,
-      html: body,
-    });
-    return;
-  }
   const user = setting("SMTP_USER");
   const pass = setting("SMTP_PASS");
+  let refused: unknown = null;
+  if (binding && (Date.now() >= cloudflareFullUntil || !user || !pass)) {
+    try {
+      await binding.send({
+        from: { email: setting("SMTP_FROM") || "me@dealwithmuhammad.com", name: "DWM Clip" },
+        to,
+        subject: subject.replace(/[\r\n]+/g, " ").slice(0, 150),
+        text,
+        html: body,
+      });
+      return;
+    } catch (e) {
+      refused = e;
+      if (isLimit(e)) cloudflareFullUntil = Date.now() + 10 * 60_000;
+      console.error("Cloudflare email refused", (e as { code?: string })?.code ?? "", e);
+    }
+  } else if (binding) {
+    refused = new MailLimitError("Cloudflare's daily quota is used up");
+  }
   if (!user || !pass) {
+    if (refused) throw isLimit(refused) ? new MailLimitError(String(refused)) : refused;
     if (process.env.NODE_ENV === "production") throw new Error("SMTP_USER and SMTP_PASS are not set");
     console.log(`[dev] email to ${to}: ${subject}\n${text}`);
     return;
@@ -78,15 +99,22 @@ export async function sendMail({ to, subject, text, html }: { to: string; subjec
     part("text/plain", text) + part("text/html", body) + `--${boundary}--`,
     ".",
   ].join("\r\n");
-  await smtp(host, [
-    ["EHLO dealwithmuhammad.com", 250],
-    [`AUTH PLAIN ${Buffer.from(`\0${user}\0${pass}`).toString("base64")}`, 235],
-    [`MAIL FROM:<${user}>`, 250],
-    [`RCPT TO:<${to}>`, 250],
-    ["DATA", 354],
-    [message, 250],
-    ["QUIT", 221],
-  ]);
+  try {
+    await smtp(host, [
+      ["EHLO dealwithmuhammad.com", 250],
+      [`AUTH PLAIN ${Buffer.from(`\0${user}\0${pass}`).toString("base64")}`, 235],
+      [`MAIL FROM:<${user}>`, 250],
+      [`RCPT TO:<${to}>`, 250],
+      ["DATA", 354],
+      [message, 250],
+      ["QUIT", 221],
+    ]);
+  } catch (e) {
+    console.error("Gmail email refused", e);
+    // Both services said no: say so when either one was out of its daily allowance.
+    if (isLimit(e) || (refused && isLimit(refused))) throw new MailLimitError(e instanceof Error ? e.message : String(e));
+    throw e;
+  }
 }
 
 export function sendCode(to: string, code: string, link: string) {
