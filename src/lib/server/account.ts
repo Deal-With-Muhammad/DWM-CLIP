@@ -31,6 +31,9 @@ export type Account = {
   videos: number;
   videosMade: number;
   videosLeft: number;
+  /** Video hours bought, used (only the length actually clipped) and left. */
+  hoursBought: number;
+  hoursLeft: number;
   clipsPerVideo: number;
   maxHours: number;
   jobsAtOnce: number;
@@ -45,11 +48,17 @@ export type Account = {
 };
 
 export async function accountOf(user: User): Promise<Account> {
-  const [subs, used, usage, started] = await Promise.all([
+  const [subs, used, usage, started, hours] = await Promise.all([
     all<Sub>("select id, kind, quantity, status, renews_at, ends_at, portal_url from subscriptions where user_id = ?", user.id),
     first<{ n: number }>("select coalesce(sum(bytes), 0) as n from clips where user_id = ?", user.id),
     all<{ month: string; clips: number }>("select month, clips from usage where user_id = ?", user.id),
-    first<{ n: number }>("select count(*) as n from jobs where user_id = ? and created_at >= ? and status != 'error'", user.id, `${month()}-01`),
+    first<{ n: number }>("select count(*) as n from jobs where user_id = ? and created_at >= ? and status != 'error' and paid_hours = 0", user.id, `${month()}-01`),
+    first<{ bought: number; spent: number }>(
+      `select (select coalesce(sum(hours), 0) from hour_packs where user_id = ?1 and status = 'paid') as bought,
+        (select coalesce(sum(min(paid_hours, case when duration > 0 then duration / 3600.0 else paid_hours end)), 0) from jobs
+          where user_id = ?1 and paid_hours > 0 and status != 'error') as spent`,
+      user.id,
+    ),
   ]);
   const now = nowIso();
   const active = subs.filter((s) => live(s, now));
@@ -72,6 +81,8 @@ export async function accountOf(user: User): Promise<Account> {
     videos: plan.videos,
     videosMade: started?.n ?? 0,
     videosLeft: Math.max(0, plan.videos - (started?.n ?? 0)),
+    hoursBought: hours?.bought ?? 0,
+    hoursLeft: Math.max(0, Math.round(((hours?.bought ?? 0) - (hours?.spent ?? 0)) * 100) / 100),
     clipsPerVideo: plan.clipsPerVideo,
     maxHours: plan.maxHours,
     jobsAtOnce: plan.jobsAtOnce,

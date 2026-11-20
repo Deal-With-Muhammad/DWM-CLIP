@@ -2,11 +2,11 @@ import { Check } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { FREE, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
+import { FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, hoursLeftWord, planRows } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { checkoutConfig, paymentsEnabled, portalUrl, provider, type Kind } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
-import { lemonCheckout } from "@/lib/server/lemonsqueezy";
+import { hoursCheckout, lemonCheckout } from "@/lib/server/lemonsqueezy";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -49,7 +49,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         {q.paid && (
           <p className="mt-4 rounded-xl bg-sky-soft px-3.5 py-2.5 text-[14px] text-sky">
-            Thank you! {paid ? "Your plan is active." : "Your payment is being confirmed. Refresh this page in a minute if your plan isn't showing yet."}
+            Thank you! {paid || account.hoursBought > 0 ? "Your purchase is active." : "Your payment is being confirmed. Refresh this page in a minute if it isn't showing yet."}
           </p>
         )}
 
@@ -104,6 +104,41 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </a>
             )}
             <p className="text-[12.5px] text-muted">Cancel any time. Payment is handled by {site.seller}, our reseller. 14-day refund.</p>
+          </div>
+        </section>
+
+        <section id="hours" className="card mt-4 scroll-mt-20 p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-[20px]">Video hours</h2>
+            <p className="text-[14px] text-muted">{account.hoursBought > 0 ? `${hoursLeftWord(account.hoursLeft)} left` : "Pay once, on any plan"}</p>
+          </div>
+          <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted">
+            Buy the hours you need and clip any video up to {HOURS_PER_VIDEO} hours long, even when your plan&apos;s videos for the month are used up. Only the length you clip is
+            taken: a 40-minute video uses 40 minutes. Hours never expire.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {HOUR_PACKS.map((p, i) => {
+              const href = hoursCheckout(p.hours, user.id);
+              return (
+                <div key={p.hours} className={`flex flex-col rounded-xl p-4 ${i === 1 ? "bg-brand-soft" : "bg-canvas"}`}>
+                  <p className="flex items-center gap-2 text-[15px] font-semibold">
+                    {p.hours} hours
+                    {i === 1 && <span className="rounded-md bg-brand px-1.5 py-0.5 text-[11.5px] font-semibold text-white">Popular</span>}
+                  </p>
+                  <p className="mt-1 font-display text-[26px] leading-none">${p.price}</p>
+                  <p className="mt-1.5 flex-1 text-[13px] text-muted">{Math.round((p.price / p.hours) * 100)} cents an hour, paid once</p>
+                  <div className="mt-3.5">
+                    {href ? (
+                      <a href={href} className={i === 1 ? "btn" : "btn-quiet"}>
+                        Buy {p.hours} hours
+                      </a>
+                    ) : (
+                      <p className="text-[12.5px] text-muted">Card payments open soon.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 

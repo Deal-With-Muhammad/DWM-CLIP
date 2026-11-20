@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (!engineReady()) return NextResponse.json({ ok: false, unknown: true });
   // Looking at a link starts a container, which costs money: not worth it when the member can't clip it this month.
   const account = await accountOf(user);
-  if (account.videosLeft <= 0) return NextResponse.json({ ok: false, problem: account.plan === "free" ? `You've used your ${account.videos} free videos this month. Pick a plan to keep clipping.` : "You've clipped all the videos your plan gives this month. It resets on the 1st.", upgrade: account.plan !== "pro" });
+  if (account.videosLeft <= 0 && account.hoursLeft < 0.05) return NextResponse.json({ ok: false, problem: account.plan === "free" ? `You've used your ${account.videos} free videos this month. Pick a plan to keep clipping.` : "You've clipped all the videos your plan gives this month. It resets on the 1st.", upgrade: account.plan !== "pro" });
 
   // `place` looks from one named part of the world only (used to find out which ones a video site accepts).
   const only = typeof body.place === "string" && ALL_PLACES.includes(body.place) ? body.place : undefined;
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   }
   const thumb = typeof found.thumb === "string" && /^https:\/\/i\.ytimg\.com\//.test(found.thumb) ? found.thumb : "";
   return NextResponse.json(
-    { ok: true, title: String(found.title ?? "").slice(0, 200), uploader: String(found.uploader ?? "").slice(0, 120), seconds: Math.max(0, Math.round(Number(found.seconds) || 0)), live: found.live === true, thumb, place: found.place, planSeconds: account.maxHours * 3600, ...(only ? { where: `${found.where?.colo ?? ""} ${found.where?.country ?? ""}`.trim() } : {}) },
+    { ok: true, title: String(found.title ?? "").slice(0, 200), uploader: String(found.uploader ?? "").slice(0, 120), seconds: Math.max(0, Math.round(Number(found.seconds) || 0)), live: found.live === true, thumb, place: found.place, planSeconds: account.maxHours * 3600, hoursLeft: account.hoursLeft, ...(only ? { where: `${found.where?.colo ?? ""} ${found.where?.country ?? ""}`.trim() } : {}) },
     { headers: { "cache-control": "no-store" } },
   );
 }

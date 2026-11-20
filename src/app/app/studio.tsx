@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { CLIP_BYTES, LAYOUTS, LITE, PRO, formatBytes, lengthWord } from "@/lib/plans";
+import { CLIP_BYTES, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -50,6 +50,8 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   const [found, setFound] = useState<Found>({ state: videoUrl(startUrl) ? "looking" : "none" });
   const [from, setFrom] = useState(0);
   const [lookAgain, setLookAgain] = useState(0);
+  // Bought video hours to clip this video with (0: it is one of the plan's videos).
+  const [hours, setHours] = useState(0);
   const { account, jobs } = data;
   const free = account.plan === "free";
   const working = jobs.some((j) => busy(j) || j.clips.some((c) => c.status === "updating"));
@@ -68,9 +70,20 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
     return () => clearInterval(t);
   }, [working, refresh]);
 
+  // When a link is known: bought hours are used by themselves when the plan can't take this video
+  // (no videos left this month, or the video is longer than the plan takes). The member can change it.
+  const autoHours = (seconds: number, live: boolean, planSeconds: number) => {
+    const left = account.hoursLeft;
+    if (left < 0.05) return 0;
+    if (account.videosLeft > 0 && (live || seconds <= planSeconds + 1)) return 0;
+    const need = Math.ceil(seconds / 1800) / 2 || 1;
+    return Math.max(Math.min(0.5, left), Math.min(need, HOURS_PER_VIDEO, Math.floor(left * 2) / 2 || left));
+  };
+
   const paste = (value: string) => {
     setUrl(value);
     setFrom(0);
+    setHours(0);
     setFound({ state: videoUrl(value) ? "looking" : "none" });
   };
 
@@ -84,7 +97,10 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
         const res = await fetch("/api/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: link }), signal: stop.signal });
         const j = await res.json().catch(() => ({}));
         if (stop.signal.aborted) return;
-        if (j.ok) setFound({ state: "ok", title: j.title, uploader: j.uploader, seconds: j.seconds, live: j.live, thumb: j.thumb, place: j.place, planSeconds: j.planSeconds });
+        if (j.ok) {
+          setFound({ state: "ok", title: j.title, uploader: j.uploader, seconds: j.seconds, live: j.live, thumb: j.thumb, place: j.place, planSeconds: j.planSeconds });
+          setHours(autoHours(j.seconds, j.live, j.planSeconds));
+        }
         else if (res.ok && typeof j.problem === "string" && j.problem) setFound({ state: "bad", text: j.problem, again: j.again === true });
         else setFound({ state: "unknown" });
       } catch {
@@ -97,8 +113,14 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
     };
   }, [url, lookAgain]);
 
+  // Lengths a member with bought hours can clip at once, up to what they have left.
+  const hourChoices = [0.5, 1, 2, 3, HOURS_PER_VIDEO].filter((h) => h <= account.hoursLeft + 0.001);
+  const noPlanVideo = account.videosLeft <= 0;
+  /** How much of the video is clipped at once: the plan's length, or the bought hours chosen. */
+  const span = found.state === "ok" ? (hours > 0 ? hours * 3600 : found.planSeconds) : 0;
+
   // A video longer than the plan takes at once: one stretch of it is clipped, and the member says where it starts.
-  const tooLong = found.state === "ok" && !found.live && found.planSeconds > 0 && found.seconds > found.planSeconds + 1;
+  const tooLong = found.state === "ok" && !found.live && span > 0 && found.seconds > span + 1;
 
   const start = async () => {
     if (!url.trim() || sending || found.state === "looking" || found.state === "bad") return;
@@ -119,6 +141,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           focus,
           look: style === "custom" ? look : null,
           from: tooLong ? from : 0,
+          useHours: hours,
           place: found.state === "ok" ? found.place : "",
         }),
       });
@@ -140,12 +163,12 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
     await refresh();
   };
 
-  const maxClips = Math.max(1, Math.min(account.clipsPerVideo, account.clipsLeft || 1));
+  const maxClips = Math.max(1, Math.min(hours > 0 ? Math.max(account.clipsPerVideo, HOURS_CLIPS_PER_VIDEO) : account.clipsPerVideo, account.clipsLeft || 1));
   const needsKey = !hasKey;
   const asked = Math.min(clips, maxClips);
   // How many clips of the chosen length the video (or the stretch of it that is looked at) can hold.
   const shortest = Math.round((maxLen * 2) / 3);
-  const looked = found.state === "ok" ? Math.min(found.seconds, found.planSeconds || found.seconds) : 0;
+  const looked = found.state === "ok" ? Math.min(found.seconds, span || found.seconds) : 0;
   const room = found.state === "ok" && looked > 0 ? Math.max(1, Math.floor(looked / shortest)) : asked;
   const spaceLeft = account.storage - account.used;
   const hint = LAYOUTS.find((l) => l.id === layout)?.hint;
@@ -167,7 +190,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
             <Link2 className="pointer-events-none absolute start-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted" aria-hidden />
             <input value={url} onChange={(e) => paste(e.target.value)} type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" autoCapitalize="none" spellCheck={false} className="field-native !h-12 ps-10" />
           </label>
-          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || account.videosLeft <= 0 || account.clipsLeft <= 0 || found.state === "looking" || found.state === "bad"}>
+          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || (noPlanVideo && hours <= 0) || account.clipsLeft <= 0 || found.state === "looking" || found.state === "bad"}>
             {sending ? "Starting…" : found.state === "looking" ? "Checking the link…" : "Make clips"}
           </Button>
         </form>
@@ -200,20 +223,44 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
                 </p>
               </div>
             </div>
-            {found.live && found.seconds > found.planSeconds && (
+            {account.hoursLeft >= 0.05 && (
+              <div className="mt-3">
+                <p className="text-[13.5px] leading-snug text-ink-2">
+                  Clip it with your video hours ({hoursLeftWord(account.hoursLeft)} left). Only the length clipped is used.
+                </p>
+                <div className="seg mt-2">
+                  {!noPlanVideo && (
+                    <button type="button" aria-pressed={hours === 0} onClick={() => setHours(0)}>
+                      No, use my plan
+                    </button>
+                  )}
+                  {hourChoices.map((h) => (
+                    <button key={h} type="button" aria-pressed={hours === h} onClick={() => setHours(h)}>
+                      {lengthWord(h)}
+                    </button>
+                  ))}
+                  {hourChoices.length === 0 && (
+                    <button type="button" aria-pressed={hours > 0} onClick={() => setHours(account.hoursLeft)}>
+                      {hoursLeftWord(account.hoursLeft)}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {found.live && found.seconds > span && (
               <p className="mt-2.5 text-[13.5px] leading-snug text-ink-2">
-                The clips will come from its last {hoursWord(found.planSeconds / 3600)}, the most your plan takes at once.
+                The clips will come from its last {hoursWord(span / 3600)}{hours > 0 ? "." : ", the most your plan takes at once."}
               </p>
             )}
             {tooLong && (
               <div className="mt-2.5">
                 <p className="text-[13.5px] leading-snug text-ink-2">
-                  Your plan takes {hoursWord(found.planSeconds / 3600)} of a video at a time, and this one is longer. Choose which {hoursWord(found.planSeconds / 3600)} to clip:
+                  {hours > 0 ? `This video is longer than ${hoursWord(span / 3600)}.` : `Your plan takes ${hoursWord(span / 3600)} of a video at a time, and this one is longer.`} Choose which {hoursWord(span / 3600)} to clip:
                 </p>
                 <input
                   type="range"
                   min={0}
-                  max={found.seconds - found.planSeconds}
+                  max={found.seconds - span}
                   step={60}
                   value={from}
                   onChange={(e) => setFrom(Number(e.target.value))}
@@ -221,10 +268,10 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
                   className="mt-2 w-full accent-[var(--violet)]"
                 />
                 <p className="mt-1 text-[13.5px] tabular-nums">
-                  From <span className="font-semibold">{moment(from)}</span> to <span className="font-semibold">{moment(from + found.planSeconds)}</span>
-                  {account.plan !== "pro" && (
-                    <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
-                      Take more at once
+                  From <span className="font-semibold">{moment(Math.min(from, found.seconds - span))}</span> to <span className="font-semibold">{moment(Math.min(from, found.seconds - span) + span)}</span>
+                  {hours <= 0 && account.hoursLeft < 0.05 && (
+                    <Link href="/app/settings#hours" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
+                      Clip up to {HOURS_PER_VIDEO} hours with video hours
                     </Link>
                   )}
                 </p>
@@ -338,15 +385,24 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
             )}
           </Note>
         )}
-        {!problem && !needsKey && account.videosLeft <= 0 && (
+        {!problem && !needsKey && noPlanVideo && (
           <Note tone="warn">
             {free
               ? `You've used your ${account.videos} free videos this month. They come back on the 1st.`
               : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`}{" "}
-            {account.plan !== "pro" && (
-              <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
-                {free ? `Get ${LITE.videos} videos a month for $${LITE.price}` : `Move up to Pro for ${PRO.videos} a month`}
-              </Link>
+            {account.hoursLeft >= 0.05 ? (
+              <span>Paste a link to clip it with your video hours ({hoursLeftWord(account.hoursLeft)} left).</span>
+            ) : (
+              <>
+                {account.plan !== "pro" && (
+                  <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
+                    {free ? `Get ${LITE.videos} videos a month for $${LITE.price}` : `Move up to Pro for ${PRO.videos} a month`}
+                  </Link>
+                )}{" "}
+                <Link href="/app/settings#hours" className="font-medium underline underline-offset-4">
+                  or buy video hours from $3
+                </Link>
+              </>
             )}
           </Note>
         )}
@@ -508,6 +564,10 @@ function Meters({ account }: { account: Account }) {
         <Bar value={account.videosMade / Math.max(1, account.videos)} />
         <p className="mt-2 text-[12.5px] leading-snug text-muted">
           Up to {lengthWord(account.maxHours)} of each video, {account.clipsPerVideo} clips from it. Resets on the 1st.
+          {account.hoursBought > 0 && ` Video hours left: ${hoursLeftWord(account.hoursLeft)}.`}{" "}
+          <Link href="/app/settings#hours" className="font-medium text-brand-ink underline underline-offset-4">
+            {account.hoursBought > 0 ? "Buy more" : "Buy video hours"}
+          </Link>
         </p>
       </div>
       <div className="card px-4 py-3.5">

@@ -29,6 +29,44 @@ export function lemonCheckout(kind: Kind, userId: string) {
   return link ? `${link}?${encodeURIComponent("checkout[custom][user_id]")}=${encodeURIComponent(userId)}` : null;
 }
 
+/** The checkout page for one pack of video hours. */
+export function hoursCheckout(hours: number, userId: string) {
+  const link = setting(`LEMONSQUEEZY_LINK_HOURS_${hours}`);
+  return link ? `${link}?${encodeURIComponent("checkout[custom][user_id]")}=${encodeURIComponent(userId)}` : null;
+}
+
+/** Hours in a pack, read from the variant bought (LEMONSQUEEZY_HOURS_VARIANTS = "variant:hours,..."). */
+function hoursOfVariant(variantId: string | null) {
+  if (!variantId) return 0;
+  for (const pair of setting("LEMONSQUEEZY_HOURS_VARIANTS").split(",")) {
+    const [v, h] = pair.split(":").map((x) => x.trim());
+    if (v === variantId) return Math.max(0, Number(h) || 0);
+  }
+  return 0;
+}
+
+/** The parts of an order webhook the site uses: a pack of video hours bought or refunded. */
+export type LemonOrder = { event: string; id: string; userId: string | null; hours: number; status: string; email: string | null; testMode: boolean };
+
+export function parseLemonOrder(payload: unknown): LemonOrder | null {
+  const p = payload as { meta?: { event_name?: string; custom_data?: Record<string, unknown> }; data?: { type?: string; id?: string; attributes?: Record<string, unknown> } };
+  if (p?.data?.type !== "orders" || !p.data.id || !p.data.attributes) return null;
+  const a = p.data.attributes;
+  const item = a.first_order_item as { product_id?: number; variant_id?: number; quantity?: number } | undefined;
+  // Only the hours product counts; the store also sells DWM Invite.
+  if (!item || String(item.product_id ?? "") !== setting("LEMONSQUEEZY_PRODUCT_HOURS")) return null;
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return {
+    event: p.meta?.event_name ?? "",
+    id: p.data.id,
+    userId: str(p.meta?.custom_data?.user_id),
+    hours: hoursOfVariant(String(item.variant_id ?? "")) * Math.max(1, Number(item.quantity ?? 1) || 1),
+    status: a.refunded === true ? "refunded" : String(a.status ?? ""),
+    email: str(a.user_email),
+    testMode: a.test_mode === true,
+  };
+}
+
 function kindOfProduct(productId: string | null): Kind | null {
   if (!productId) return null;
   if (productId === setting("LEMONSQUEEZY_PRODUCT_PRO")) return "pro";

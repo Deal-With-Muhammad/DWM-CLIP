@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { cleanLook } from "@/lib/look";
 import { videoUrl } from "@/lib/link";
-import { ENGINE_LAYOUT, LAYOUTS, LITE, RETIRED_MODELS, STYLES } from "@/lib/plans";
+import { ENGINE_LAYOUT, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, RETIRED_MODELS, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
 import { ALL_PLACES, engineReady, startJob } from "@/lib/server/engine";
@@ -28,7 +28,7 @@ const between = (v: unknown, lo: number, hi: number, fallback: number) => (typeo
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return fail(401, "Sign in first.");
-  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; focus?: unknown; look?: unknown; from?: unknown; place?: unknown };
+  let body: { url?: unknown; clips?: unknown; style?: unknown; layout?: unknown; maxLen?: unknown; captions?: unknown; tighten?: unknown; focus?: unknown; look?: unknown; from?: unknown; place?: unknown; useHours?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -39,7 +39,11 @@ export async function POST(req: Request) {
   if ((await hit(`clip:job:${user.id}`, 3600)) > 30) return fail(429, "That's a lot of videos in an hour. Try again a little later.");
 
   const account = await accountOf(user);
-  if (account.videosLeft <= 0) {
+  // Bought video hours: this video is clipped for up to `paidHours` and doesn't use one of the plan's videos.
+  const askedHours = typeof body.useHours === "number" && Number.isFinite(body.useHours) ? body.useHours : 0;
+  const paidHours = askedHours > 0 ? Math.round(Math.min(askedHours, HOURS_PER_VIDEO, account.hoursLeft) * 100) / 100 : 0;
+  if (askedHours > 0 && paidHours < 0.05) return fail(402, "You have no video hours left. Buy more in Settings.", { upgrade: true });
+  if (!paidHours && account.videosLeft <= 0) {
     return fail(
       402,
       account.plan === "free"
@@ -70,7 +74,7 @@ export async function POST(req: Request) {
   // gives clips of 40 to 60 seconds and never a 17-second one.
   const maxLen = between(body.maxLen, 20, 90, 60);
   const options = {
-    max_clips: Math.min(between(body.clips, 1, 20, 3), account.clipsPerVideo, account.clipsLeft),
+    max_clips: Math.min(between(body.clips, 1, 20, 3), paidHours ? Math.max(account.clipsPerVideo, HOURS_CLIPS_PER_VIDEO) : account.clipsPerVideo, account.clipsLeft),
     min_len: Math.round((maxLen * 2) / 3),
     max_len: maxLen,
     // "custom" is the member's own look, sent to the engine beside the options.
@@ -86,7 +90,7 @@ export async function POST(req: Request) {
   const id = randomUUID();
   const at = nowIso();
   await run(
-    "insert into jobs (id, user_id, url, status, stage, options, focus, ai_mode, model, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?, ?)",
+    "insert into jobs (id, user_id, url, status, stage, options, focus, ai_mode, model, paid_hours, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?, ?, ?)",
     id,
     user.id,
     url,
@@ -94,6 +98,7 @@ export async function POST(req: Request) {
     focus,
     "own",
     ai.model,
+    paidHours,
     at,
     at,
   );
@@ -104,7 +109,7 @@ export async function POST(req: Request) {
       callback: `${siteOrigin(req)}/api/engine`,
       options,
       ai,
-      max_hours: account.maxHours,
+      max_hours: paidHours || account.maxHours,
       focus,
       look: body.style === "custom" ? cleanLook(body.look) : null,
       // For a video longer than the plan takes at once: where the member wants the clipped stretch to start.

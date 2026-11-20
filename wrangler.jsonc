@@ -27,6 +27,12 @@
     "LEMONSQUEEZY_PRODUCT_LITE": "1533120",
     "LEMONSQUEEZY_PRODUCT_PRO": "1533076",
     "LEMONSQUEEZY_PRODUCT_STORAGE": "1533077",
+    // Video hours, paid once (product 1534465): one checkout link per pack, and "variant id:hours" for each pack.
+    "LEMONSQUEEZY_LINK_HOURS_10": "https://pay.dealwithmuhammad.com/checkout/buy/820ef20f-b4ef-44e5-be4b-e12047ec32ba",
+    "LEMONSQUEEZY_LINK_HOURS_30": "https://pay.dealwithmuhammad.com/checkout/buy/16520a18-b3bf-4752-9775-92b0057b053c",
+    "LEMONSQUEEZY_LINK_HOURS_100": "https://pay.dealwithmuhammad.com/checkout/buy/d96e5141-3650-478c-81e9-008f8f05930f",
+    "LEMONSQUEEZY_PRODUCT_HOURS": "1534465",
+    "LEMONSQUEEZY_HOURS_VARIANTS": "2386546:10,2386547:30,2386549:100",
     // Paddle (live account, seller 250501). None of these are secret.
     "PADDLE_PRICE_PRO": "pri_01m7nhv6fjjfddgywjn8pfxb5s",
     "PADDLE_PRICE_STORAGE": "pri_01m7nhy71415w5etdh0d4t9qns",

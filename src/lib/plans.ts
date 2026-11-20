@@ -36,6 +36,24 @@ export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, cl
 
 export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
 
+/**
+ * Video hours, bought once and never expiring, on any plan (Free too). They clip a video longer than the plan
+ * takes, up to HOURS_PER_VIDEO at a time, or any video once the plan's videos for the month are used. Only the
+ * length actually clipped is taken. Our cost is about 5.5 cents an hour of video (2026-11-20), so even the
+ * biggest pack leaves most of the price after Lemon Squeezy's 5% + 50 cents.
+ */
+export const HOUR_PACKS = [
+  { hours: 10, price: 3 },
+  { hours: 30, price: 7 },
+  { hours: 100, price: 19 },
+] as const;
+export const HOURS_PER_VIDEO = 4;
+/** Clips from one video made with bought hours, when the plan gives fewer. */
+export const HOURS_CLIPS_PER_VIDEO = 5;
+
+/** "2.5 hours", "45 minutes": a balance of hours the way people say it. */
+export const hoursLeftWord = (h: number) => (h <= 0 ? "no hours" : h < 1 ? `${Math.max(1, Math.round(h * 60))} minutes` : `${Math.round(h * 10) / 10} hour${Math.round(h * 10) / 10 === 1 ? "" : "s"}`);
+
 /** Extra storage, sold in blocks on top of a paid plan. */
 export const STORAGE_PACK = { bytes: 10 * GB, price: 2 };
 

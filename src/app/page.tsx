@@ -5,7 +5,7 @@ import { HeroVideo } from "@/components/hero-video";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
-import { FREE, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
+import { FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -217,7 +217,7 @@ export default async function Home() {
               })}
             </div>
             <p className="mt-5 text-[14px] text-muted">
-              Need more room? Add {formatBytes(STORAGE_PACK.bytes)} of storage to Lite or Pro for ${STORAGE_PACK.price} a month, as many times as you like.
+              Need more? Buy video hours on any plan, from ${HOUR_PACKS[0].price} for {HOUR_PACKS[0].hours} hours, paid once: clip videos up to {HOURS_PER_VIDEO} hours long, and only the length you clip is used. Add {formatBytes(STORAGE_PACK.bytes)} of storage to Lite or Pro for ${STORAGE_PACK.price} a month.
             </p>
           </div>
         </section>
