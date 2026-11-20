@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { CLIP_BYTES, LAYOUTS, formatBytes } from "@/lib/plans";
+import { CLIP_BYTES, LAYOUTS, LITE, PRO, formatBytes, lengthWord } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -167,7 +167,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
             <Link2 className="pointer-events-none absolute start-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted" aria-hidden />
             <input value={url} onChange={(e) => paste(e.target.value)} type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" autoCapitalize="none" spellCheck={false} className="field-native !h-12 ps-10" />
           </label>
-          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || account.clipsLeft <= 0 || found.state === "looking" || found.state === "bad"}>
+          <Button type="submit" size="lg" isDisabled={sending || !url.trim() || needsKey || account.videosLeft <= 0 || account.clipsLeft <= 0 || found.state === "looking" || found.state === "bad"}>
             {sending ? "Starting…" : found.state === "looking" ? "Checking the link…" : "Make clips"}
           </Button>
         </form>
@@ -338,7 +338,19 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
             )}
           </Note>
         )}
-        {!problem && !needsKey && account.clipsLeft <= 0 && (
+        {!problem && !needsKey && account.videosLeft <= 0 && (
+          <Note tone="warn">
+            {free
+              ? `You've used your ${account.videos} free videos this month. They come back on the 1st.`
+              : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`}{" "}
+            {account.plan !== "pro" && (
+              <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
+                {free ? `Get ${LITE.videos} videos a month for $${LITE.price}` : `Move up to Pro for ${PRO.videos} a month`}
+              </Link>
+            )}
+          </Note>
+        )}
+        {!problem && !needsKey && account.videosLeft > 0 && account.clipsLeft <= 0 && (
           <Note tone="warn">
             You&apos;ve made the most clips this plan allows in a month. It resets on the 1st.{" "}
             {account.plan !== "pro" && (
@@ -483,13 +495,20 @@ function Meters({ account }: { account: Account }) {
     <section className="mt-4 grid gap-3 sm:grid-cols-2">
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[13.5px] text-muted">Clips this month</p>
+          <p className="text-[13.5px] text-muted">Videos this month</p>
           <p className="text-[13.5px] tabular-nums">
-            <span className="font-semibold">{account.clipsMade}</span> made
+            <span className="font-semibold">{account.videosMade}</span> of {account.videos}
+            {account.plan !== "pro" && account.videosLeft <= Math.ceil(account.videos / 4) && (
+              <Link href="/app/settings#plan" className="ms-2 font-medium text-brand-ink underline underline-offset-4">
+                Get more
+              </Link>
+            )}
           </p>
         </div>
-        {/* There is no count to run out of: the storage beside this is the limit. */}
-        <p className="mt-2 text-[12.5px] leading-snug text-muted">Your storage is the limit. Delete clips to make room for new ones.</p>
+        <Bar value={account.videosMade / Math.max(1, account.videos)} />
+        <p className="mt-2 text-[12.5px] leading-snug text-muted">
+          Up to {lengthWord(account.maxHours)} of each video, {account.clipsPerVideo} clips from it. Resets on the 1st.
+        </p>
       </div>
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">

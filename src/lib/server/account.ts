@@ -27,6 +27,10 @@ export type Account = {
   clips: number;
   clipsMade: number;
   clipsLeft: number;
+  /** Videos allowed this calendar month, started so far (errored ones don't count), and left. */
+  videos: number;
+  videosMade: number;
+  videosLeft: number;
   clipsPerVideo: number;
   maxHours: number;
   jobsAtOnce: number;
@@ -41,10 +45,11 @@ export type Account = {
 };
 
 export async function accountOf(user: User): Promise<Account> {
-  const [subs, used, usage] = await Promise.all([
+  const [subs, used, usage, started] = await Promise.all([
     all<Sub>("select id, kind, quantity, status, renews_at, ends_at, portal_url from subscriptions where user_id = ?", user.id),
     first<{ n: number }>("select coalesce(sum(bytes), 0) as n from clips where user_id = ?", user.id),
     all<{ month: string; clips: number }>("select month, clips from usage where user_id = ?", user.id),
+    first<{ n: number }>("select count(*) as n from jobs where user_id = ? and created_at >= ? and status != 'error'", user.id, `${month()}-01`),
   ]);
   const now = nowIso();
   const active = subs.filter((s) => live(s, now));
@@ -64,6 +69,9 @@ export async function accountOf(user: User): Promise<Account> {
     clips: plan.clips,
     clipsMade: made,
     clipsLeft: Math.max(0, plan.clips - made),
+    videos: plan.videos,
+    videosMade: started?.n ?? 0,
+    videosLeft: Math.max(0, plan.videos - (started?.n ?? 0)),
     clipsPerVideo: plan.clipsPerVideo,
     maxHours: plan.maxHours,
     jobsAtOnce: plan.jobsAtOnce,

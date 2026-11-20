@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { cleanLook } from "@/lib/look";
 import { videoUrl } from "@/lib/link";
-import { ENGINE_LAYOUT, LAYOUTS, RETIRED_MODELS, STYLES } from "@/lib/plans";
+import { ENGINE_LAYOUT, LAYOUTS, LITE, RETIRED_MODELS, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
 import { ALL_PLACES, engineReady, startJob } from "@/lib/server/engine";
@@ -39,6 +39,15 @@ export async function POST(req: Request) {
   if ((await hit(`clip:job:${user.id}`, 3600)) > 30) return fail(429, "That's a lot of videos in an hour. Try again a little later.");
 
   const account = await accountOf(user);
+  if (account.videosLeft <= 0) {
+    return fail(
+      402,
+      account.plan === "free"
+        ? `You've used your ${account.videos} free videos this month. Pick a plan to keep clipping: Lite is $${LITE.price} for ${LITE.videos} videos a month.`
+        : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`,
+      { upgrade: account.plan !== "pro" },
+    );
+  }
   if (account.clipsLeft <= 0) {
     return fail(402, "You've made the most clips this plan allows in a month. It resets on the 1st.", { upgrade: account.plan !== "pro" });
   }

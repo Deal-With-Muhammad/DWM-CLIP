@@ -19,16 +19,20 @@ export type Plan = {
    *  ceiling nobody clipping by hand reaches, so one account can't run the engine all month at our cost
    *  (a clip costs us about a cent to make). */
   clips: number;
+  /** Videos a member may start in a calendar month (errored ones don't count). Each video runs a container
+   *  that costs us about 5 cents an hour of video (measured 2026-11-20), so this is what keeps the bill down. */
+  videos: number;
   clipsPerVideo: number;
+  /** The longest stretch of one video that is clipped at once. 0.5 is 30 minutes. */
   maxHours: number;
   jobsAtOnce: number;
   /** The tallest picture fetched from the video. Clips are always 1080x1920. */
   quality: number;
 };
 
-export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, clipsPerVideo: 2, maxHours: 1, jobsAtOnce: 1, quality: 720 };
-export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 120, clipsPerVideo: 5, maxHours: 2, jobsAtOnce: 1, quality: 1080 };
-export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080 };
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 2, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720 };
+export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 150, videos: 25, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080 };
+export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, videos: 80, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080 };
 
 export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
 
@@ -80,14 +84,18 @@ export function roomFor(bytes: number) {
 /** What a plan gives, one line each, for the plan cards. */
 export function planRows(p: Plan) {
   return [
-    `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,
+    `${p.videos} videos a month`,
+    `Up to ${lengthWord(p.maxHours)} of each video`,
     `${p.clipsPerVideo} clips from one video`,
-    `${p.maxHours === 1 ? "1 hour" : `${p.maxHours} hours`} of a video at a time`,
+    `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,
     ...(p.quality >= 1080 ? ["Sharper 1080p source"] : []),
     ...(p.jobsAtOnce > 1 ? ["Two videos at once"] : []),
     ...(p.id === "free" ? [] : ["Add 10 GB more whenever you need it"]),
   ];
 }
+
+/** 0.5 -> "30 minutes", 1 -> "1 hour", 3 -> "3 hours". */
+export const lengthWord = (hours: number) => (hours < 1 ? `${Math.round(hours * 60)} minutes` : hours === 1 ? "1 hour" : `${hours} hours`);
 
 export function formatBytes(n: number) {
   if (n >= GB) return `${(n / GB).toFixed(n >= 10 * GB ? 0 : 1).replace(/\.0$/, "")} GB`;

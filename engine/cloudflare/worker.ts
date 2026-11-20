@@ -23,7 +23,10 @@ export class ClipEngine extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-    this.starting ??= this.startAndWaitForPort().finally(() => {
+    // Looking at a link only runs yt-dlp, so it gets the smallest box: memory is billed for every second a
+    // container is on, and an 8 GiB box for a 20-second look was a third of the bill (2026-11-20).
+    const small = new URL(request.url).pathname === "/check";
+    this.starting ??= this.startAndWaitForPort(small).finally(() => {
       this.starting = undefined;
     });
     await this.starting;
@@ -35,13 +38,13 @@ export class ClipEngine extends DurableObject<Env> {
     return this.ctx.container!.getTcpPort(PORT).fetch(forwarded);
   }
 
-  private async startAndWaitForPort(): Promise<void> {
+  private async startAndWaitForPort(small = false): Promise<void> {
     const container = this.ctx.container!;
     if (!container.running) {
       const proxy = this.env.YTDLP_PROXY ? { HTTPS_PROXY: this.env.YTDLP_PROXY, HTTP_PROXY: this.env.YTDLP_PROXY } : {};
       container.start({
         image: container.images.base,
-        instance: "standard-3", // 2 vCPU, 8 GiB: enough for the speech model and a 1080p render
+        instance: small ? "basic" : "standard-3", // basic: 1/4 vCPU, 1 GiB. standard-3: 2 vCPU, 8 GiB for the speech model and a 1080p render
         enableInternet: true,
         // YT_COOKIES: a YouTube account's cookies, so age-restricted videos can be fetched (see set-youtube-cookies.sh).
         env: { ENGINE_SECRET: this.env.ENGINE_SECRET, ENGINE_ONE_SHOT: "1", ...proxy, ...(this.env.YT_COOKIES ? { YT_COOKIES: this.env.YT_COOKIES } : {}) },

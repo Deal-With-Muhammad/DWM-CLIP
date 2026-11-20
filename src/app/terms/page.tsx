@@ -1,5 +1,5 @@
 import { Legal } from "@/components/legal";
-import { FREE, LITE, PRO, formatBytes } from "@/lib/plans";
+import { FREE, LITE, PRO, formatBytes, lengthWord } from "@/lib/plans";
 import { site } from "@/lib/site";
 
 export const metadata = { title: "Terms" };
@@ -21,7 +21,7 @@ export default function Terms() {
       <section>
         <h2>Plans and limits</h2>
         <p>
-          On every plan the clips are made with your own AI key, and you can keep as many as fit in your storage. Free: {formatBytes(FREE.storage)} of storage, {FREE.clipsPerVideo} clips from one video, up to {FREE.clips} clips a month. Lite: {formatBytes(LITE.storage)}, {LITE.clipsPerVideo} clips from one video, up to {LITE.clips} a month. Pro: {formatBytes(PRO.storage)}, {PRO.clipsPerVideo} clips from one video, up to {PRO.clips} a month. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
+          On every plan the clips are made with your own AI key, and you can keep as many as fit in your storage. Free: {FREE.videos} videos a month, up to {lengthWord(FREE.maxHours)} of each, {FREE.clipsPerVideo} clips from one video, {formatBytes(FREE.storage)} of storage. Lite: {LITE.videos} videos a month, up to {lengthWord(LITE.maxHours)} of each, {LITE.clipsPerVideo} clips from one video, {formatBytes(LITE.storage)}. Pro: {PRO.videos} videos a month, up to {lengthWord(PRO.maxHours)} of each, {PRO.clipsPerVideo} clips from one video, {formatBytes(PRO.storage)}. A video that fails to clip doesn't count. Each plan also has a ceiling of clips a month (Free {FREE.clips}, Lite {LITE.clips}, Pro {PRO.clips}). Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
           already paid for.
         </p>
       </section>

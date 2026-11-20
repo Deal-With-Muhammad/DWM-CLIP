@@ -111,7 +111,7 @@ def _stop_when_idle(server):
         time.sleep(5)
         n = _alive() + _checks[0]
         had = had or n > 0 or _checks[1] > 0
-        if (had and n == 0) or (not had and time.time() - _started > 600):
+        if (had and n == 0) or (not had and time.time() - _started > 90):
             server.shutdown()
             return
 

@@ -29,4 +29,4 @@ export function moment(seconds: number) {
   return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export const hoursWord = (hours: number) => (hours === 1 ? "hour" : `${hours} hours`);
+export const hoursWord = (hours: number) => (hours < 1 ? `${Math.round(hours * 60)} minutes` : hours === 1 ? "hour" : `${hours} hours`);

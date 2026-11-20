@@ -23,10 +23,13 @@ export async function POST(req: Request) {
   if (!url) return NextResponse.json({ ok: false, problem: "Paste a YouTube, Twitch or Kick link: a video, or a stream that is live now." });
   if ((await hit(`clip:check:${user.id}`, 3600)) > 90) return NextResponse.json({ ok: false, unknown: true });
   if (!engineReady()) return NextResponse.json({ ok: false, unknown: true });
+  // Looking at a link starts a container, which costs money: not worth it when the member can't clip it this month.
+  const account = await accountOf(user);
+  if (account.videosLeft <= 0) return NextResponse.json({ ok: false, problem: account.plan === "free" ? `You've used your ${account.videos} free videos this month. Pick a plan to keep clipping.` : "You've clipped all the videos your plan gives this month. It resets on the 1st.", upgrade: account.plan !== "pro" });
 
   // `place` looks from one named part of the world only (used to find out which ones a video site accepts).
   const only = typeof body.place === "string" && ALL_PLACES.includes(body.place) ? body.place : undefined;
-  const [found, account] = await Promise.all([checkLink(url, only), accountOf(user)]);
+  const found = await checkLink(url, only);
   if (!found || (!found.ok && !found.error)) return NextResponse.json({ ok: false, unknown: true });
   if (!found.ok) {
     const problem = (found.error ?? "").replace(/PeakCut/g, "DWM Clip").replace(/Upload the video file instead, or use a/, "Try a");
