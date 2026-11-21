@@ -5,7 +5,7 @@ import { HeroVideo } from "@/components/hero-video";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
-import { FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, planRows } from "@/lib/plans";
+import { FREE, FREE_CLOSED_ON, FREE_OPEN, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, planRows, videosWord } from "@/lib/plans";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -32,7 +32,7 @@ const FAQ = [
   },
   {
     q: "Can I clip a stream while it's live?",
-    a: "Yes. Paste the stream's link while it's on air. The clips are picked from what has been broadcast so far: the last hour on the free plan, two hours on Lite, three on Pro. A Twitch or Kick channel has to keep recordings of its streams for this, which most do.",
+    a: "Yes. Paste the stream's link while it's on air. The clips are picked from what has been broadcast so far, as much as your plan takes at once: the last hour on Lite, the last three on Pro. A Twitch or Kick channel has to keep recordings of its streams for this, which most do.",
   },
   { q: "How long does it take?", a: "A 20-minute video takes about three minutes. Clips appear one by one as they finish, so you can start posting before the whole video is done." },
   { q: "What if the video has no facecam?", a: "Then the game fills the screen, and the page tells you so. Nothing is made up: the webcam is only shown when the video really has one." },
@@ -40,6 +40,14 @@ const FAQ = [
   { q: "Can I change a clip I don't like?", a: "Yes. Open it, press Edit, and change the hook, the caption style, the layout or where it starts and ends. Changing a clip doesn't use up one of your clips." },
   { q: "Is it only for GTA 6?", a: "No. It knows GTA VI and 20 other games by name, so titles and hashtags fit the game, but it works on any video where something happens or someone talks." },
   { q: "What happens when my storage is full?", a: "New clips aren't saved until you delete some or add storage. Download the clips you want to keep, delete them here, and the space is yours again." },
+  ...(FREE_OPEN
+    ? []
+    : [
+        {
+          q: "Is there a free plan?",
+          a: `Not any more, and we're sorry about that. We opened with one, and on ${FREE_CLOSED_ON} we closed it: so many people joined in the first days that the clipping itself cost more than we could cover. Clips made on it are kept for ${FREE.keepDays} days and can still be downloaded. Plans start at $${LITE.price} a month, and the AI runs on your own key, which several services give away for free.`,
+        },
+      ]),
   { q: "How long are my clips kept?", a: `On the Free plan, ${FREE.keepDays} days from when a clip is made, then it's deleted, so download the ones you want. On Lite and Pro your clips stay until you delete them.` },
   { q: "Can I cancel?", a: "Yes, any time, from Settings. You keep your plan until the end of the month you paid for. If it didn't work for you, ask within 14 days of a payment and you get that payment back." },
 ];
@@ -47,7 +55,7 @@ const FAQ = [
 export default async function Home() {
   const user = await currentUser().catch(() => null);
   const plans = [
-    { plan: FREE, line: `Try it on ${FREE.videos} videos a month`, cta: "Start free", href: "/signup", rows: planRows(FREE) },
+    { plan: FREE, line: FREE_OPEN ? `Try it on ${videosWord(FREE.videos)} a month` : "Closed for now, sorry", cta: FREE_OPEN ? "Start free" : "Create an account", href: "/signup", rows: planRows(FREE) },
     {
       plan: LITE,
       line: "For posting most days",
@@ -108,7 +116,8 @@ export default async function Home() {
               <div className="mt-7">
                 <TryBox />
                 <p className="mt-3 text-[13.5px] text-white/65">
-                  Free to try with your own AI key, no card: {FREE.videos} videos a month. {LITE.videos} videos a month from ${LITE.price}.
+                  {FREE_OPEN ? `Free to try with your own AI key, no card: ${videosWord(FREE.videos)} a month. ` : "The AI runs on your own key. "}
+                  {LITE.videos} videos a month from ${LITE.price}.
                 </p>
               </div>
               <p className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-white/65">
@@ -187,7 +196,7 @@ export default async function Home() {
         <section id="pricing" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="font-display text-[32px]">Pricing</h2>
-            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">Start free. The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. Cancel any time.</p>
+            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">{FREE_OPEN ? "Start free. " : ""}The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. Cancel any time.</p>
             <div className="mt-9 grid gap-4 md:grid-cols-3">
               {plans.map(({ plan, line, cta, href, rows }) => {
                 const best = plan.id === "pro";
@@ -242,7 +251,7 @@ export default async function Home() {
           <div className="rounded-3xl bg-tile-violet px-6 py-12 text-center text-white sm:px-10">
             <h2 className="mx-auto max-w-[560px] font-display text-[30px] leading-tight">Your next clip is already sitting in a stream somewhere.</h2>
             <Link href={user ? "/app" : "/signup"} className="mt-6 inline-flex h-12 items-center rounded-xl bg-white px-6 text-[16px] font-semibold text-[#3a1fa8] transition-colors hover:bg-[#f2eeff]">
-              {user ? "Open the app" : "Make your first clip free"}
+              {user ? "Open the app" : FREE_OPEN ? "Make your first clip free" : "Make your first clip"}
             </Link>
           </div>
         </section>

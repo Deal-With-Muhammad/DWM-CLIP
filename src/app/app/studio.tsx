@@ -388,7 +388,7 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
         {!problem && !needsKey && noPlanVideo && (
           <Note tone="warn">
             {free
-              ? `You've used your ${account.videos} free videos this month. They come back on the 1st.`
+              ? (account.freeWaits ?? `You've used your free ${account.videos === 1 ? "video" : `${account.videos} videos`} this month. ${account.videos === 1 ? "It comes" : "They come"} back on the 1st.`)
               : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`}{" "}
             {account.hoursLeft >= 0.05 ? (
               <span>Paste a link to clip it with your video hours ({hoursLeftWord(account.hoursLeft)} left).</span>

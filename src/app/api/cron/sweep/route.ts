@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logAdmin } from "@/lib/server/auth-helpers";
+import { settleEnded } from "@/lib/server/budget";
 import { clientIp } from "@/lib/server/http";
 import { sweepExpired, sweepFreeClips } from "@/lib/server/library";
 import { currentUser, isAdminEmail, same } from "@/lib/server/session";
@@ -21,6 +22,8 @@ export async function POST(req: Request) {
   // Only a count may use another number of days: what is deleted always follows the plan.
   const swept = await sweepFreeClips(dry && days >= 1 ? { days, dry } : { dry });
   if (!dry) await sweepExpired();
+  // Videos that stopped without a last word go into the spending ledger.
+  if (!dry) await settleEnded();
   if (!dry && admin) await logAdmin(admin.email, "sweep-free-clips", `${swept.clips} clips, ${swept.bytes} bytes`, clientIp(req.headers));
   console.log("clean-up", JSON.stringify(swept));
   return NextResponse.json(swept);

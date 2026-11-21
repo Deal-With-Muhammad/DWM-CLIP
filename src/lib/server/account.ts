@@ -1,6 +1,7 @@
 import "server-only";
 
-import { PLANS, STORAGE_PACK, type PlanId } from "@/lib/plans";
+import { FREE_CLOSED, FREE_OPEN, PLANS, STORAGE_PACK, type PlanId } from "@/lib/plans";
+import { closedNote, spend } from "@/lib/server/budget";
 import { all, first, nowIso } from "@/lib/server/db";
 import type { User } from "@/lib/server/session";
 
@@ -45,6 +46,9 @@ export type Account = {
   planEnds: string | null;
   /** True when a member upgraded to Pro and is still paying for Lite too. */
   paysForBoth: boolean;
+  /** Free plan only: set while the Free plan is closed, or its videos wait for the next day or billing cycle
+   *  (lib/server/budget.ts). It says why; `videosLeft` is 0 meanwhile, so bought hours still work. */
+  freeWaits: string | null;
 };
 
 export async function accountOf(user: User): Promise<Account> {
@@ -70,6 +74,9 @@ export async function accountOf(user: User): Promise<Account> {
   const packs = id === "free" ? 0 : active.filter((s) => s.kind === "storage").reduce((n, s) => n + Math.max(1, s.quantity), 0);
   const made = usage.find((u) => u.month === month())?.clips ?? 0;
   const sub = id === "pro" ? proSub : id === "lite" ? liteSub : undefined;
+  const left = Math.max(0, plan.videos - (started?.n ?? 0));
+  // Free videos share a daily allowance between all members. Only looked up for a member who has a video left.
+  const freeWaits = id !== "free" ? null : !FREE_OPEN ? FREE_CLOSED : left > 0 ? closedNote(await spend()) : null;
   return {
     plan: id,
     planName: plan.name,
@@ -80,7 +87,7 @@ export async function accountOf(user: User): Promise<Account> {
     clipsLeft: Math.max(0, plan.clips - made),
     videos: plan.videos,
     videosMade: started?.n ?? 0,
-    videosLeft: Math.max(0, plan.videos - (started?.n ?? 0)),
+    videosLeft: freeWaits ? 0 : left,
     hoursBought: hours?.bought ?? 0,
     hoursLeft: Math.max(0, Math.round(((hours?.bought ?? 0) - (hours?.spent ?? 0)) * 100) / 100),
     clipsPerVideo: plan.clipsPerVideo,
@@ -91,5 +98,6 @@ export async function accountOf(user: User): Promise<Account> {
     portal: sub?.portal_url ?? active.find((s) => s.portal_url)?.portal_url ?? null,
     planEnds: sub?.ends_at ?? null,
     paysForBoth: Boolean(proSub && liteSub),
+    freeWaits,
   };
 }

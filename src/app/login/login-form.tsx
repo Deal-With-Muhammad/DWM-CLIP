@@ -3,6 +3,8 @@
 import { Button, Input, Label, TextField } from "@heroui/react";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+
+import { FREE_CLOSED_ON, FREE_OPEN, LITE } from "@/lib/plans";
 import { useRef, useState } from "react";
 
 type Step = { kind: "email" } | { kind: "code"; email: string };
@@ -106,7 +108,9 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
           {reauth
             ? "The admin area asks for a fresh code every 12 hours."
             : signup
-              ? "Enter your email and we'll send a 6-digit code to confirm it. It's free with your own AI key, no card needed."
+              ? FREE_OPEN
+                ? "Enter your email and we'll send a 6-digit code to confirm it. It's free with your own AI key, no card needed."
+                : `Enter your email and we'll send a 6-digit code to confirm it. Plans start at $${LITE.price} a month; the free plan closed on ${FREE_CLOSED_ON}.`
               : "Enter your email and we'll send you a 6-digit code. There's no password to remember."}
         </p>
         <form

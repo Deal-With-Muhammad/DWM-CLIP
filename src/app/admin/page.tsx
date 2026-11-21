@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
+import { BUDGET, cycle, spend } from "@/lib/server/budget";
 import { all, first } from "@/lib/server/db";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
@@ -42,6 +43,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const since = ago(DAYS);
   const week = ago(7);
   const now = ago(0);
+  const money = await spend();
   const [account, totals, subs, signups, clipDays, jobDays, hours, jobs, events] = await Promise.all([
     accountOf(user),
     first<{ users: number; users7: number; jobs: number; failed: number; clips: number; bytes: number; keys: number; active7: number; done: number; aiOk: number }>(
@@ -99,6 +101,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <Tile label="Video hours sold" value={hours?.sold ?? 0} sub={`${hours?.packs ?? 0} pack${hours?.packs === 1 ? "" : "s"} to ${hours?.buyers ?? 0} member${hours?.buyers === 1 ? "" : "s"}`} />
           <Tile label="Active this week" value={t.active7} sub="members who clipped a video" />
           <Tile label="Clips made" value={t.clips} sub={`${t.jobs} video${t.jobs === 1 ? "" : "s"}, ${t.failed} failed`} />
+          <Tile label="Engine cost this cycle" value={`$${money.cycleSoFar.toFixed(2)}`} sub={`estimate, since ${cycle().start}; Free videos pause at $${BUDGET.cycle} from ${BUDGET.cycleFrom}`} />
+          <Tile label="Free videos today" value={`$${money.freeToday.toFixed(2)} of $${BUDGET.day}`} sub={money.closed === "paused" ? "Free plan is closed (FREE_OPEN in plans.ts)" : money.closed ? `waiting until ${money.opens?.slice(0, 16).replace("T", " ")} UTC` : "open; resets at midnight UTC"} />
           <Tile label="Storage in use" value={formatBytes(t.bytes)} sub={`about $${((t.bytes / 1024 ** 3) * 0.015).toFixed(2)}/month on R2`} />
           <Tile label="Members with an AI key" value={`${t.keys} of ${t.users}`} sub="every plan clips with the member's own key" />
           <Tile label="AI picked the moments" value={`${t.aiOk} of ${t.done}`} sub="finished videos; the rest fell back to the loudest moments" />

@@ -33,9 +33,22 @@ export type Plan = {
   keepDays: number;
 };
 
-export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 2, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720, keepDays: 7 };
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 1, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720, keepDays: 7 };
 export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 150, videos: 25, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080, keepDays: 0 };
 export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, videos: 80, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, keepDays: 0 };
+
+/**
+ * Whether the Free plan takes new videos. Closed on 21 November 2026 (the owner's decision): in its first four
+ * days Free clipping cost about $18 a day in containers, against $8 a month coming in. While it is closed a Free
+ * member can still sign in, watch and download the clips they made, and buy a plan or video hours; they can't
+ * start a video or change a clip. Set this to true to open it again: the daily and monthly ceilings in
+ * lib/server/budget.ts then apply.
+ */
+export const FREE_OPEN: boolean = false;
+/** The day the Free plan closed, as members read it. */
+export const FREE_CLOSED_ON = "21 November 2026";
+/** What a Free member is told while the plan is closed. The way to carry on (a plan, or hours) follows it. */
+export const FREE_CLOSED = `Sorry, the free plan closed on ${FREE_CLOSED_ON}. So many people joined that free clipping cost more than we could cover, and we apologise for the inconvenience.`;
 
 export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
 
@@ -53,6 +66,9 @@ export const HOUR_PACKS = [
 export const HOURS_PER_VIDEO = 4;
 /** Clips from one video made with bought hours, when the plan gives fewer. */
 export const HOURS_CLIPS_PER_VIDEO = 5;
+
+/** "1 video", "25 videos". */
+export const videosWord = (n: number) => `${n} video${n === 1 ? "" : "s"}`;
 
 /** "2.5 hours", "45 minutes": a balance of hours the way people say it. */
 export const hoursLeftWord = (h: number) => (h <= 0 ? "no hours" : h < 1 ? `${Math.max(1, Math.round(h * 60))} minutes` : `${Math.round(h * 10) / 10} hour${Math.round(h * 10) / 10 === 1 ? "" : "s"}`);
@@ -104,8 +120,9 @@ export function roomFor(bytes: number) {
 
 /** What a plan gives, one line each, for the plan cards. */
 export function planRows(p: Plan) {
+  if (p.id === "free" && !FREE_OPEN) return [`Closed to new videos since ${FREE_CLOSED_ON}`, `Clips already made are kept for ${p.keepDays} days`, "Watch and download them any time"];
   return [
-    `${p.videos} videos a month`,
+    `${videosWord(p.videos)} a month`,
     `Up to ${lengthWord(p.maxHours)} of each video`,
     `${p.clipsPerVideo} clips from one video`,
     `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,

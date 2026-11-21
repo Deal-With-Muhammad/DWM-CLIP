@@ -62,6 +62,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!saved) return fail(409, "This clip can't be changed any more. Make it again from the video link.");
 
   const account = await accountOf(user);
+  // Remaking a clip runs the engine too. While the Free plan is closed, that is for members who have paid.
+  if (account.freeWaits && account.hoursBought <= 0) return fail(402, `${account.freeWaits} Changing a clip needs a plan or video hours.`, { upgrade: true });
   const at = nowIso();
   await run("update clips set status = 'updating', error = null, edited_at = ? where id = ?", at, id);
   try {

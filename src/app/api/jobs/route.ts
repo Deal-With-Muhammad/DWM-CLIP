@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     return fail(
       402,
       account.plan === "free"
-        ? `You've used your ${account.videos} free videos this month. Pick a plan to keep clipping: Lite is $${LITE.price} for ${LITE.videos} videos a month.`
+        ? `${account.freeWaits ?? `You've used your free ${account.videos === 1 ? "video" : `${account.videos} videos`} this month.`} ${account.freeWaits ? "New videos need a plan" : "Pick a plan to keep clipping"}: Lite is $${LITE.price} a month for ${LITE.videos} videos, or buy video hours from $3.`
         : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`,
       { upgrade: account.plan !== "pro" },
     );
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
   const id = randomUUID();
   const at = nowIso();
   await run(
-    "insert into jobs (id, user_id, url, status, stage, options, focus, ai_mode, model, paid_hours, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?, ?, ?)",
+    "insert into jobs (id, user_id, url, status, stage, options, focus, ai_mode, model, paid_hours, plan, created_at, updated_at) values (?, ?, ?, 'queued', 'Starting', ?, ?, ?, ?, ?, ?, ?, ?)",
     id,
     user.id,
     url,
@@ -99,6 +99,7 @@ export async function POST(req: Request) {
     "own",
     ai.model,
     paidHours,
+    paidHours ? "hours" : account.plan,
     at,
     at,
   );

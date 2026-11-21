@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { settle } from "@/lib/server/budget";
 import { first, nowIso, run } from "@/lib/server/db";
 import { hoursWord, moment } from "@/lib/link";
 import { checkJobToken } from "@/lib/server/engine";
@@ -112,5 +113,7 @@ export async function POST(req: Request) {
     status === "running" ? null : at,
     id,
   );
+  // The video has ended: its container time goes into the spending ledger (lib/server/budget.ts).
+  if (status !== "running") await settle(id).catch((e) => console.error("settle", id, e));
   return NextResponse.json({ ok: true });
 }
