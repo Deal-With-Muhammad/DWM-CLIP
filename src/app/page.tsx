@@ -62,7 +62,8 @@ export default async function Home() {
   // if the database can't be asked.
   const made = await first<{ clips: number; people: number }>("select (select coalesce(sum(clips), 0) from usage) as clips, (select count(distinct user_id) from usage where clips > 0) as people").catch(() => null);
   const plans = [
-    { plan: FREE, line: FREE_OPEN ? `Try it on ${videosWord(FREE.videos)} a month` : "Closed for now, sorry", cta: FREE_OPEN ? "Start free" : "Create an account", href: "/signup", rows: planRows(FREE) },
+    // While the Free plan is closed it isn't a plan anyone can pick, so it isn't shown as one.
+    ...(FREE_OPEN ? [{ plan: FREE, line: `Try it on ${videosWord(FREE.videos)} a month`, cta: "Start free", href: "/signup", rows: planRows(FREE) }] : []),
     {
       plan: LITE,
       line: "For posting most days",
@@ -121,7 +122,21 @@ export default async function Home() {
                 DWM Clip watches a stream or long video for you, finds the best moments, and cuts each one into a vertical clip with captions, a hook, a title and hashtags.
               </p>
               <div className="mt-7">
-                <TryBox />
+                {FREE_OPEN ? (
+                  <TryBox />
+                ) : (
+                  // A link box here would lead to a sign-up and then a price: the plans are shown first instead.
+                  <div className="flex flex-wrap gap-2.5">
+                    <a href="#pricing" className="btn h-12 px-6 text-[16px]">
+                      See plans, from ${LITE.price}
+                    </a>
+                    {user && (
+                      <Link href="/app" className="inline-flex h-12 items-center rounded-xl bg-white/10 px-6 text-[16px] font-semibold text-white transition-colors hover:bg-white/15">
+                        Open the app
+                      </Link>
+                    )}
+                  </div>
+                )}
                 <p className="mt-3 text-[13.5px] text-white/65">
                   {FREE_OPEN ? `Free to try with your own AI key, no card: ${videosWord(FREE.videos)} a month. ` : "The AI runs on your own key. "}
                   Plans from ${LITE.price} for {PLAN_DAYS} days, paid once.
@@ -210,7 +225,7 @@ export default async function Home() {
                 {!FREE_OPEN && ` Nearly all of them were made on the free plan, which is why it closed on ${FREE_CLOSED_ON}: that much clipping cost more than we could cover. Thank you for using it, and sorry to those who came for it. Plans start at $${LITE.price} for ${PLAN_DAYS} days.`}
               </p>
             )}
-            <div className="mt-9 grid gap-4 md:grid-cols-3">
+            <div className={`mt-9 grid gap-4 ${FREE_OPEN ? "md:grid-cols-3" : "max-w-[760px] md:grid-cols-2"}`}>
               {plans.map(({ plan, line, cta, href, rows }) => {
                 const best = plan.id === "pro";
                 return (

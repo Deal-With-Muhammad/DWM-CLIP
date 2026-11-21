@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { EARLIER, FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PLAN_DAYS, PRO, STORAGE_PACK, formatBytes, hoursLeftWord, planRows } from "@/lib/plans";
+import { EARLIER, FREE, FREE_OPEN, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PLAN_DAYS, PRO, STORAGE_PACK, formatBytes, hoursLeftWord, planRows } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { checkoutConfig, paymentsEnabled, portalUrl, provider, type Kind } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
@@ -56,7 +56,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <section id="plan" className="card mt-6 scroll-mt-20 p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-display text-[20px]">Your plan: {account.planName}</h2>
+            <h2 className="font-display text-[20px]">{paid || FREE_OPEN ? `Your plan: ${account.planName}` : "You don't have a plan yet"}</h2>
             <p className="text-[14px] text-muted">
               {account.clipsMade} clip{account.clipsMade === 1 ? "" : "s"} made this month · {formatBytes(account.used)} of {formatBytes(account.storage)} used
             </p>
@@ -80,8 +80,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <p className="mt-2 rounded-xl bg-warn-soft px-3.5 py-2.5 text-[14px] text-warn-ink">You&apos;re on Pro and still paying for Lite. Cancel Lite with &quot;Manage or cancel&quot; below so you aren&apos;t charged for both.</p>
           )}
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {[FREE, LITE, PRO].map((p) => {
+          {!paid && account.freeWaits && <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">{account.freeWaits}</p>}
+
+          <div className={`mt-5 grid gap-3 ${FREE_OPEN ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+            {(FREE_OPEN ? [FREE, LITE, PRO] : [LITE, PRO]).map((p) => {
               const mine = p.id === account.plan;
               const up = (p.id === "lite" && account.plan === "free") || (p.id === "pro" && account.plan !== "pro");
               // A member on a 30-day plan can add another 30 days to it before it runs out.

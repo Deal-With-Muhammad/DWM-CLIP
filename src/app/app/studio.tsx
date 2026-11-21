@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { CLIP_BYTES, FREE, PLAN_DAYS, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
+import { CLIP_BYTES, FREE, PLAN_DAYS, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord, planRows } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -33,7 +33,7 @@ const file = (c: Clip, part?: "cover") => `/api/clips/${c.id}/file?${part ? "par
 const IDEAS = ["Only the funny moments", "Fails and rage", "Clutch plays", "Police chases", "Moments with shouting"];
 
 /** The whole signed-in app: paste a link, watch it being clipped, play, change and download the clips. */
-export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: boolean; startUrl: string }) {
+export function Studio({ initial, hasKey, startUrl, buy }: { initial: Data; hasKey: boolean; startUrl: string; buy: { lite: string | null; pro: string | null } }) {
   const [data, setData] = useState(initial);
   const [url, setUrl] = useState(startUrl);
   const [clips, setClips] = useState(3);
@@ -173,8 +173,15 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
   const spaceLeft = account.storage - account.used;
   const hint = LAYOUTS.find((l) => l.id === layout)?.hint;
 
+  // No plan and no bought hours while the Free plan is closed: there is nothing to clip with, so the link box
+  // isn't shown at all. The member sees why, and the plans, and still has the clips they made below.
+  const noPlan = free && Boolean(account.freeWaits) && account.hoursLeft < 0.05;
+
   return (
     <div className="mx-auto w-full max-w-[1080px] px-4 pb-20 sm:px-6">
+      {noPlan ? (
+        <NoPlan note={account.freeWaits ?? ""} buy={buy} />
+      ) : (
       <section className="card rise mt-6 p-4 sm:p-6">
         <h1 className="font-display text-[24px] leading-tight sm:text-[28px]">Paste a video or live stream link</h1>
         <p className="mt-1.5 text-[14.5px] text-muted">YouTube, Twitch or Kick. A stream can still be live: the clips come from what it has shown so far.</p>
@@ -419,14 +426,15 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           </Note>
         )}
       </section>
+      )}
 
-      <Meters account={account} />
+      <Meters account={account} noPlan={noPlan} />
 
       <section className="mt-9">
         <h2 className="font-display text-[20px]">Your videos</h2>
         {free && FREE.keepDays > 0 && jobs.some((j) => j.clips.length > 0) && (
           <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
-            On the Free plan a clip is kept for {FREE.keepDays} days, then deleted. Download the ones you want, or{" "}
+            Without a plan a clip is kept for {FREE.keepDays} days, then deleted. Download the ones you want, or{" "}
             <Link href="/app/settings" className="text-ink underline underline-offset-4">
               pick a plan
             </Link>{" "}
@@ -555,14 +563,61 @@ function Note({ tone, children }: { tone: "warn" | "danger"; children: React.Rea
   );
 }
 
+/** What a member with no plan sees in place of the link box: why, and the two plans. */
+function NoPlan({ note, buy }: { note: string; buy: { lite: string | null; pro: string | null } }) {
+  const plans = [
+    { plan: LITE, href: buy.lite },
+    { plan: PRO, href: buy.pro },
+  ];
+  return (
+    <section className="card rise mt-6 p-4 sm:p-6">
+      <h1 className="font-display text-[24px] leading-tight sm:text-[28px]">Pick a plan to make clips</h1>
+      <p className="mt-2 max-w-[660px] text-[15px] leading-relaxed text-ink-2">{note}</p>
+      <p className="mt-1.5 max-w-[660px] text-[14.5px] leading-relaxed text-muted">
+        You pay once for {PLAN_DAYS} days and nothing renews by itself. The AI that picks the moments still runs on your own key.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {plans.map(({ plan, href }) => (
+          <div key={plan.id} className={`flex flex-col rounded-xl p-4 ${plan.id === "pro" ? "bg-brand-soft" : "bg-canvas"}`}>
+            <p className="text-[15px] font-semibold">{plan.name}</p>
+            <p className="mt-1 font-display text-[26px] leading-none">
+              ${plan.price}
+              <span className="text-[14px] font-normal text-muted"> for {PLAN_DAYS} days</span>
+            </p>
+            <ul className="mt-3.5 flex-1 space-y-1.5 text-[13.5px] text-ink-2">
+              {planRows(plan).map((r) => (
+                <li key={r} className="flex gap-2">
+                  <Check className="mt-[3px] size-[15px] shrink-0 text-brand" aria-hidden />
+                  {r}
+                </li>
+              ))}
+            </ul>
+            <a href={href ?? "/app/settings#plan"} className={`mt-4 ${plan.id === "pro" ? "btn" : "btn-quiet"}`}>
+              Get {plan.name}
+            </a>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-[13.5px] text-muted">
+        Only need a few videos?{" "}
+        <Link href="/app/settings#hours" className="font-medium text-brand-ink underline underline-offset-4">
+          Buy video hours from $3
+        </Link>
+        , paid once.
+      </p>
+    </section>
+  );
+}
+
 /** Clips left and storage used, with the way to get more. */
-function Meters({ account }: { account: Account }) {
+function Meters({ account, noPlan }: { account: Account; noPlan: boolean }) {
   const full = account.used / account.storage;
   return (
-    <section className="mt-4 grid gap-3 sm:grid-cols-2">
+    <section className={`mt-4 grid gap-3 ${noPlan ? "" : "sm:grid-cols-2"}`}>
+      {!noPlan && (
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[13.5px] text-muted">Videos this month</p>
+          <p className="text-[13.5px] text-muted">{account.pass ? `Videos in these ${PLAN_DAYS} days` : "Videos this month"}</p>
           <p className="text-[13.5px] tabular-nums">
             <span className="font-semibold">{account.videosMade}</span> of {account.videos}
             {account.plan !== "pro" && account.videosLeft <= Math.ceil(account.videos / 4) && (
@@ -574,13 +629,14 @@ function Meters({ account }: { account: Account }) {
         </div>
         <Bar value={account.videosMade / Math.max(1, account.videos)} />
         <p className="mt-2 text-[12.5px] leading-snug text-muted">
-          Up to {lengthWord(account.maxHours)} of each video, {account.clipsPerVideo} clips from it. Resets on the 1st.
+          Up to {lengthWord(account.maxHours)} of each video, {account.clipsPerVideo} clips from it.{account.pass ? "" : " Resets on the 1st."}
           {account.hoursBought > 0 && ` Video hours left: ${hoursLeftWord(account.hoursLeft)}.`}{" "}
           <Link href="/app/settings#hours" className="font-medium text-brand-ink underline underline-offset-4">
             {account.hoursBought > 0 ? "Buy more" : "Buy video hours"}
           </Link>
         </p>
       </div>
+      )}
       <div className="card px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[13.5px] text-muted">Storage</p>

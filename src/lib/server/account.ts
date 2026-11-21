@@ -97,7 +97,7 @@ export async function accountOf(user: User): Promise<Account> {
   const freeWaits = id !== "free" ? null : !FREE_OPEN ? FREE_CLOSED : left > 0 ? closedNote(await spend()) : null;
   return {
     plan: id,
-    planName: plan.name,
+    planName: id === "free" && !FREE_OPEN ? "No plan" : plan.name,
     storage: plan.storage + packs * STORAGE_PACK.bytes + (user.bonus_bytes || 0),
     used: used?.n ?? 0,
     clips: plan.clips,

@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
 import { accountOf } from "@/lib/server/account";
+import { provider } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
+import { passCheckout } from "@/lib/server/lemonsqueezy";
 import { listJobs } from "@/lib/server/library";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 
@@ -19,7 +21,13 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   return (
     <>
       <AppHeader email={user.email} plan={account.plan} planName={account.planName} admin={isAdminEmail(user.email)} />
-      <Studio initial={{ jobs, account }} hasKey={Boolean(key)} startUrl={url} />
+      <Studio
+        initial={{ jobs, account }}
+        hasKey={Boolean(key)}
+        startUrl={url}
+        // Where a member with no plan buys one: straight to the checkout, with their id on it.
+        buy={provider() === "lemonsqueezy" ? { lite: passCheckout("lite", user.id), pro: passCheckout("pro", user.id) } : { lite: null, pro: null }}
+      />
     </>
   );
 }
