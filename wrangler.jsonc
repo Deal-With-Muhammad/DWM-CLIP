@@ -3,7 +3,10 @@
   // DWM Clip on Cloudflare Workers (pages built by OpenNext), database on D1, clips on R2.
   // Deploy with `npm run cf:deploy`. The clip engine (engine/) runs separately; ENGINE_URL points at it.
   "name": "dwm-clip",
-  "main": ".open-next/worker.js",
+  // custom-worker.js wraps OpenNext's Worker (.open-next/worker.js) and adds the hourly clean-up timer.
+  "main": "custom-worker.js",
+  // Every hour at :17, Free-plan clips older than the plan keeps them are deleted (see custom-worker.js).
+  "triggers": { "crons": ["17 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },

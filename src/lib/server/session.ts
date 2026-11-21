@@ -5,7 +5,7 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { cookies } from "next/headers";
 import { cache } from "react";
 
-import { first, nowIso, run, stmt, batch } from "@/lib/server/db";
+import { all, batch, first, nowIso, run, stmt } from "@/lib/server/db";
 import { setting } from "@/lib/server/settings";
 
 // Members sign in with a 6-digit code (or link) sent by email; there are no
@@ -31,7 +31,7 @@ export function secretKey() {
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const keyed = (s: string) => createHmac("sha256", secretKey()).update(s).digest("hex");
-const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+export const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 /** The signed-in user. Read once per request; every page and route goes through here. */
 export const currentUser = cache(async (): Promise<User | null> => {
@@ -44,31 +44,40 @@ export const currentUser = cache(async (): Promise<User | null> => {
   );
 });
 
-/** Makes a new code and link for this email (replacing any earlier one). */
+/**
+ * Makes a new code and link for this email. Earlier ones that haven't expired keep working: an email can be slow,
+ * and a member who asks twice often types the code from the first one.
+ */
 export async function issueCode(email: string) {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const link = randomBytes(24).toString("base64url");
-  await run(
-    `insert into login_codes (email, code_hash, link_hash, tries, expires_at) values (?, ?, ?, 0, ?)
-     on conflict (email) do update set code_hash = excluded.code_hash, link_hash = excluded.link_hash, tries = 0, expires_at = excluded.expires_at`,
-    email,
-    keyed(`code:${email}:${code}`),
-    keyed(`link:${email}:${link}`),
-    new Date(Date.now() + CODE_MINUTES * 60_000).toISOString(),
-  );
+  await batch([
+    stmt("delete from login_tokens where email = ? and expires_at <= ?", email, nowIso()),
+    stmt(
+      "insert into login_tokens (email, code_hash, link_hash, tries, expires_at) values (?, ?, ?, 0, ?)",
+      email,
+      keyed(`code:${email}:${code}`),
+      keyed(`link:${email}:${link}`),
+      new Date(Date.now() + CODE_MINUTES * 60_000).toISOString(),
+    ),
+  ]);
   return { code, link };
 }
 
-type Waiting = { code_hash: string; link_hash: string; tries: number; expires_at: string };
+type Waiting = { id: number; code_hash: string; link_hash: string };
 
-/** Checks a code or link. Each code only gets a few tries, and works only once. */
+/**
+ * Checks a code or link against every one still waiting for this email. A typed code works once and only gets a
+ * few wrong tries. The link keeps working until it expires: email apps open links to scan them, and members tap
+ * the link in one browser and then type the code in another, and both used to end in "expired or already used".
+ */
 export async function checkCode(email: string, proof: { code: string } | { link: string }) {
-  const row = await first<Waiting>("select code_hash, link_hash, tries, expires_at from login_codes where email = ?", email);
-  if (!row || row.expires_at <= nowIso() || row.tries >= CODE_TRIES) return false;
-  const ok = "code" in proof ? same(row.code_hash, keyed(`code:${email}:${proof.code}`)) : same(row.link_hash, keyed(`link:${email}:${proof.link}`));
-  if (ok) await run("delete from login_codes where email = ?", email);
-  else await run("update login_codes set tries = tries + 1 where email = ?", email);
-  return ok;
+  const rows = await all<Waiting>("select id, code_hash, link_hash from login_tokens where email = ? and expires_at > ? and tries < ?", email, nowIso(), CODE_TRIES);
+  if ("link" in proof) return rows.some((r) => same(r.link_hash, keyed(`link:${email}:${proof.link}`)));
+  const match = rows.find((r) => same(r.code_hash, keyed(`code:${email}:${proof.code}`)));
+  if (match) await run("delete from login_tokens where id = ?", match.id);
+  else if (rows.length) await run("update login_tokens set tries = tries + 1 where email = ? and expires_at > ?", email, nowIso());
+  return Boolean(match);
 }
 
 /** Signs this email in, making the account the first time, and sets the cookie. */

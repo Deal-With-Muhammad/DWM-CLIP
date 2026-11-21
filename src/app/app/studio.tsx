@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { CLIP_BYTES, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
+import { CLIP_BYTES, FREE, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -422,6 +422,15 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
 
       <section className="mt-9">
         <h2 className="font-display text-[20px]">Your videos</h2>
+        {free && FREE.keepDays > 0 && jobs.some((j) => j.clips.length > 0) && (
+          <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+            On the Free plan a clip is kept for {FREE.keepDays} days, then deleted. Download the ones you want, or{" "}
+            <Link href="/app/settings" className="text-ink underline underline-offset-4">
+              pick a plan
+            </Link>{" "}
+            to keep them.
+          </p>
+        )}
         {jobs.length === 0 ? (
           <p className="card mt-3 px-5 py-12 text-center text-[15px] text-muted">Nothing here yet. Paste a link above and your clips will show up here.</p>
         ) : (

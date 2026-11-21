@@ -21,7 +21,10 @@ export async function POST(req: Request) {
     [`clip:otp:ip:${clientIp(req.headers)}`, 600],
     [`clip:otp:email:${email}`, 600],
   ]);
-  if (byIp > 8 || byEmail > 4) return NextResponse.json({ error: "Too many codes asked for. Wait a few minutes and try again." }, { status: 429 });
+  // Every code sent in the last 10 minutes still works, so asking again is rarely needed.
+  if (byIp > 12 || byEmail > 6) {
+    return NextResponse.json({ error: "Too many codes asked for. Any code we sent in the last 10 minutes still works: check your spam folder, or wait a few minutes and try again." }, { status: 429 });
+  }
 
   const next = safeNext(body.next);
   try {

@@ -6,7 +6,7 @@ export const metadata = { title: "Terms" };
 
 export default function Terms() {
   return (
-    <Legal title="Terms" updated="18 November 2026">
+    <Legal title="Terms" updated="22 November 2026">
       <section>
         <h2>What DWM Clip is</h2>
         <p>DWM Clip turns a video you give it a link to into short vertical clips. It is operated by Rafay Khan, trading as Deal With Muhammad (dealwithmuhammad.com), referred to here as &quot;we&quot;. By using it you agree to these terms.</p>
@@ -21,7 +21,7 @@ export default function Terms() {
       <section>
         <h2>Plans and limits</h2>
         <p>
-          On every plan the clips are made with your own AI key, and you can keep as many as fit in your storage. Free: {FREE.videos} videos a month, up to {lengthWord(FREE.maxHours)} of each, {FREE.clipsPerVideo} clips from one video, {formatBytes(FREE.storage)} of storage. Lite: {LITE.videos} videos a month, up to {lengthWord(LITE.maxHours)} of each, {LITE.clipsPerVideo} clips from one video, {formatBytes(LITE.storage)}. Pro: {PRO.videos} videos a month, up to {lengthWord(PRO.maxHours)} of each, {PRO.clipsPerVideo} clips from one video, {formatBytes(PRO.storage)}. A video that fails to clip doesn't count. Each plan also has a ceiling of clips a month (Free {FREE.clips}, Lite {LITE.clips}, Pro {PRO.clips}). Video hours are paid once and never expire; they clip a video up to {HOURS_PER_VIDEO} hours long, only the length clipped is taken, and a video that fails gives its hours back. A refunded pack of hours is removed. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
+          On every plan the clips are made with your own AI key, and you can keep as many as fit in your storage. Free: {FREE.videos} videos a month, up to {lengthWord(FREE.maxHours)} of each, {FREE.clipsPerVideo} clips from one video, {formatBytes(FREE.storage)} of storage. Lite: {LITE.videos} videos a month, up to {lengthWord(LITE.maxHours)} of each, {LITE.clipsPerVideo} clips from one video, {formatBytes(LITE.storage)}. Pro: {PRO.videos} videos a month, up to {lengthWord(PRO.maxHours)} of each, {PRO.clipsPerVideo} clips from one video, {formatBytes(PRO.storage)}. A video that fails to clip doesn&apos;t count. On the Free plan a clip is kept for {FREE.keepDays} days from when it is made and is then deleted; on Lite and Pro clips are kept until you delete them, and if a paid plan ends, its clips are kept for at least {FREE.keepDays} more days. Each plan also has a ceiling of clips a month (Free {FREE.clips}, Lite {LITE.clips}, Pro {PRO.clips}). Video hours are paid once and never expire; they clip a video up to {HOURS_PER_VIDEO} hours long, only the length clipped is taken, and a video that fails gives its hours back. A refunded pack of hours is removed. Paid plans are billed monthly until cancelled. Limits may change; a change never shortens a month you
           already paid for.
         </p>
       </section>

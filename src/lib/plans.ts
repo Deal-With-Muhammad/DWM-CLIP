@@ -28,11 +28,14 @@ export type Plan = {
   jobsAtOnce: number;
   /** The tallest picture fetched from the video. Clips are always 1080x1920. */
   quality: number;
+  /** Days a clip is kept before it is deleted for the member (0: kept until they delete it). Only Free has a
+   *  limit: Free clips pile up by the gigabyte each day and almost none are opened again after a week. */
+  keepDays: number;
 };
 
-export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 2, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720 };
-export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 150, videos: 25, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080 };
-export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, videos: 80, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080 };
+export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 2, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720, keepDays: 7 };
+export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 150, videos: 25, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080, keepDays: 0 };
+export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, videos: 80, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, keepDays: 0 };
 
 export const PLANS: Record<PlanId, Plan> = { free: FREE, lite: LITE, pro: PRO };
 
@@ -106,6 +109,7 @@ export function planRows(p: Plan) {
     `Up to ${lengthWord(p.maxHours)} of each video`,
     `${p.clipsPerVideo} clips from one video`,
     `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,
+    p.keepDays ? `Clips kept for ${p.keepDays} days` : "Clips kept until you delete them",
     ...(p.quality >= 1080 ? ["Sharper 1080p source"] : []),
     ...(p.jobsAtOnce > 1 ? ["Two videos at once"] : []),
     ...(p.id === "free" ? [] : ["Add 10 GB more whenever you need it"]),

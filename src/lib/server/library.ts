@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cleanLook, type Look } from "@/lib/look";
-import { fromEngineLayout } from "@/lib/plans";
+import { FREE, fromEngineLayout } from "@/lib/plans";
 import { all, env, nowIso, run } from "@/lib/server/db";
 
 // A member's videos and the clips made from them.
@@ -101,4 +101,48 @@ export const clipKeys = (userId: string, jobId: string, n: string) => ({ video: 
 export async function removeFiles(keys: (string | null | undefined)[]) {
   const list = keys.filter((k): k is string => Boolean(k));
   for (let i = 0; i < list.length; i += 1000) await env().MEDIA.delete(list.slice(i, i + 1000));
+}
+
+/**
+ * Deletes Free-plan clips older than the plan keeps them (FREE.keepDays), oldest first, files and rows. Run once a
+ * day by the Worker's timer (custom-worker.ts). The video's row stays, so it still counts towards the month.
+ *
+ * Only members who have never paid are touched: anyone with a plan given by the admin, extra storage, bought video
+ * hours, or a subscription that is running or changed within the same number of days keeps everything, so a
+ * payment that fails for a few days never costs a member their clips.
+ */
+export async function sweepFreeClips({ days = FREE.keepDays, max = 400, dry = false } = {}) {
+  if (!(days > 0)) return { clips: 0, bytes: 0, dry };
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rows = await all<{ id: string; job_id: string; video_key: string; cover_key: string | null; data_key: string | null; bytes: number }>(
+    `select c.id, c.job_id, c.video_key, c.cover_key, c.data_key, c.bytes from clips c join users u on u.id = c.user_id
+      where c.created_at < ?1 and c.status != 'updating' and u.plan_override is null and u.bonus_bytes = 0
+        and not exists (select 1 from subscriptions s where s.user_id = c.user_id
+          and (s.status in ('active', 'trialing', 'on_trial', 'past_due') or s.ends_at > ?1 or s.updated_at > ?1))
+        and not exists (select 1 from hour_packs h where h.user_id = c.user_id)
+      order by c.created_at limit ?2`,
+    cutoff,
+    max,
+  );
+  const bytes = rows.reduce((n, r) => n + (r.bytes || 0), 0);
+  if (dry || !rows.length) return { clips: rows.length, bytes, dry };
+  // Files first: if the rows fail to go, the next run finds them again and deleting a missing file is harmless.
+  await removeFiles(rows.flatMap((r) => [r.video_key, r.cover_key, r.data_key]));
+  const note = `These clips were deleted after ${days} days, as the Free plan keeps them that long.`;
+  for (let i = 0; i < rows.length; i += 50) {
+    const part = rows.slice(i, i + 50);
+    const marks = part.map(() => "?").join(", ");
+    await run(`delete from clips where id in (${marks})`, ...part.map((r) => r.id));
+    const jobs = [...new Set(part.map((r) => r.job_id))];
+    // A video left with no clips says why, instead of "no moment stood out".
+    await run(`update jobs set note = ? where id in (${jobs.map(() => "?").join(", ")}) and not exists (select 1 from clips where clips.job_id = jobs.id)`, note, ...jobs);
+  }
+  return { clips: rows.length, bytes, dry };
+}
+
+/** Sign-in codes and rate-limit counters that ended over a day ago. */
+export async function sweepExpired() {
+  const old = new Date(Date.now() - 86_400_000).toISOString();
+  await run("delete from login_tokens where expires_at < ?", old);
+  await run("delete from rate_limits where reset_at < ?", old);
 }

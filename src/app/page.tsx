@@ -40,6 +40,7 @@ const FAQ = [
   { q: "Can I change a clip I don't like?", a: "Yes. Open it, press Edit, and change the hook, the caption style, the layout or where it starts and ends. Changing a clip doesn't use up one of your clips." },
   { q: "Is it only for GTA 6?", a: "No. It knows GTA VI and 20 other games by name, so titles and hashtags fit the game, but it works on any video where something happens or someone talks." },
   { q: "What happens when my storage is full?", a: "New clips aren't saved until you delete some or add storage. Download the clips you want to keep, delete them here, and the space is yours again." },
+  { q: "How long are my clips kept?", a: `On the Free plan, ${FREE.keepDays} days from when a clip is made, then it's deleted, so download the ones you want. On Lite and Pro your clips stay until you delete them.` },
   { q: "Can I cancel?", a: "Yes, any time, from Settings. You keep your plan until the end of the month you paid for. If it didn't work for you, ask within 14 days of a payment and you get that payment back." },
 ];
 

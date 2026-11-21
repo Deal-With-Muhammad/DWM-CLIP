@@ -9,6 +9,37 @@ type Step = { kind: "email" } | { kind: "code"; email: string };
 
 const CODE_LENGTH = 6;
 
+// Mistyped email domains seen at sign-up ("gamil.com" most of all): the code goes nowhere and the member waits.
+const TYPOS: Record<string, string> = {
+  "gamil.com": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmil.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gnail.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gmail.con": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmail.cm": "gmail.com",
+  "gmail.comm": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "hotmail.con": "hotmail.com",
+  "outlok.com": "outlook.com",
+  "outlook.con": "outlook.com",
+  "yaho.com": "yahoo.com",
+  "yahooo.com": "yahoo.com",
+  "yahoo.con": "yahoo.com",
+  "icloud.con": "icloud.com",
+};
+
+/** The address with its domain corrected, when the domain is a known slip. */
+function corrected(email: string) {
+  const at = email.lastIndexOf("@");
+  const fix = TYPOS[email.slice(at + 1).replace(/[^a-z0-9.-]+$/, "")];
+  return at > 0 && fix ? `${email.slice(0, at + 1)}${fix}` : null;
+}
+
 /** Sign in or sign up with a code sent by email. No passwords. Either page works for a new or an existing address. */
 export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" | "signup"; next: string; reauth: boolean; linkFailed: boolean }) {
   const signup = mode === "signup";
@@ -19,6 +50,8 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(linkFailed ? "That sign-in link has expired or was already used. Ask for a new code." : null);
   const [resent, setResent] = useState(false);
+  // The address the member was asked about ("did you mean...?"), so they are only asked once.
+  const asked = useRef("");
   const codeInput = useRef<HTMLInputElement>(null);
 
   const post = async (path: string, body: object) => {
@@ -80,7 +113,16 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
           className="mt-7 space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (email.trim()) sendCode(email.trim().toLowerCase());
+            const to = email.trim().toLowerCase();
+            if (!to) return;
+            const fix = corrected(to);
+            if (fix && asked.current !== to) {
+              asked.current = to;
+              setEmail(fix);
+              setError(`That looked like a typo, so we changed it to ${fix}. Press the button again if that's right.`);
+              return;
+            }
+            sendCode(to);
           }}
         >
           <TextField value={email} onChange={setEmail} type="email" autoComplete="email" name="email">
@@ -157,7 +199,7 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
       </form>
       <p className="mt-5 text-[14px] leading-relaxed text-muted">
         {resent ? (
-          "New code sent. It can take a minute, and it may land in spam."
+          "New code sent. It can take a minute, and it may land in spam. The earlier code still works too."
         ) : (
           <>
             Nothing yet? Check your spam folder, or{" "}
@@ -166,7 +208,11 @@ export function LoginForm({ mode, next, reauth, linkFailed }: { mode: "signin" |
               className="text-ink underline underline-offset-4 disabled:text-muted"
               disabled={busy}
               onClick={async () => {
-                if (await sendCode(step.email)) setResent(true);
+                if (await sendCode(step.email)) {
+                  setResent(true);
+                  // The link comes back after a while, for an email that really never arrives.
+                  setTimeout(() => setResent(false), 45_000);
+                }
               }}
             >
               send a new code
