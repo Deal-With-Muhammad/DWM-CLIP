@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
 import { FREE, FREE_CLOSED_ON, FREE_OPEN, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, planRows, videosWord } from "@/lib/plans";
+import { first } from "@/lib/server/db";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -54,6 +55,9 @@ const FAQ = [
 
 export default async function Home() {
   const user = await currentUser().catch(() => null);
+  // How many clips have been made here and by how many people: the real numbers, read each time, and left out
+  // if the database can't be asked.
+  const made = await first<{ clips: number; people: number }>("select (select coalesce(sum(clips), 0) from usage) as clips, (select count(distinct user_id) from usage where clips > 0) as people").catch(() => null);
   const plans = [
     { plan: FREE, line: FREE_OPEN ? `Try it on ${videosWord(FREE.videos)} a month` : "Closed for now, sorry", cta: FREE_OPEN ? "Start free" : "Create an account", href: "/signup", rows: planRows(FREE) },
     {
@@ -197,6 +201,12 @@ export default async function Home() {
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="font-display text-[32px]">Pricing</h2>
             <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">{FREE_OPEN ? "Start free. " : ""}The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. Cancel any time.</p>
+            {made && made.clips >= 100 && (
+              <p className="mt-5 max-w-[640px] rounded-2xl bg-brand-soft px-5 py-4 text-[15.5px] leading-relaxed text-ink">
+                <strong className="font-display text-[22px] font-semibold">{made.clips.toLocaleString("en-US")}</strong> clips made by {made.people.toLocaleString("en-US")} people since we opened on 18 November 2026.
+                {!FREE_OPEN && ` Nearly all of them were made on the free plan, which is why it closed on ${FREE_CLOSED_ON}: that much clipping cost more than we could cover. Thank you for using it, and sorry to those who came for it. Plans start at $${LITE.price} a month.`}
+              </p>
+            )}
             <div className="mt-9 grid gap-4 md:grid-cols-3">
               {plans.map(({ plan, line, cta, href, rows }) => {
                 const best = plan.id === "pro";
