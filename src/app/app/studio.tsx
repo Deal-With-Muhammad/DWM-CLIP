@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { howLong, hoursWord, moment, videoUrl } from "@/lib/link";
 import { DEFAULT_LOOK, type Look } from "@/lib/look";
-import { CLIP_BYTES, FREE, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
+import { CLIP_BYTES, FREE, PLAN_DAYS, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PRO, formatBytes, hoursLeftWord, lengthWord } from "@/lib/plans";
 import type { Account } from "@/lib/server/account";
 import type { Clip, Job } from "@/lib/server/library";
 
@@ -389,14 +389,16 @@ export function Studio({ initial, hasKey, startUrl }: { initial: Data; hasKey: b
           <Note tone="warn">
             {free
               ? (account.freeWaits ?? `You've used your free ${account.videos === 1 ? "video" : `${account.videos} videos`} this month. ${account.videos === 1 ? "It comes" : "They come"} back on the 1st.`)
-              : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`}{" "}
+              : account.pass
+                ? `You've clipped all ${account.videos} videos of these ${PLAN_DAYS} days. You can add ${PLAN_DAYS} more days in Settings.`
+                : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`}{" "}
             {account.hoursLeft >= 0.05 ? (
               <span>Paste a link to clip it with your video hours ({hoursLeftWord(account.hoursLeft)} left).</span>
             ) : (
               <>
                 {account.plan !== "pro" && (
                   <Link href="/app/settings#plan" className="font-medium underline underline-offset-4">
-                    {free ? `Get ${LITE.videos} videos a month for $${LITE.price}` : `Move up to Pro for ${PRO.videos} a month`}
+                    {free ? `Get ${LITE.videos} videos for $${LITE.price}` : `Move up to Pro: ${PRO.videos} videos in ${PLAN_DAYS} days`}
                   </Link>
                 )}{" "}
                 <Link href="/app/settings#hours" className="font-medium underline underline-offset-4">

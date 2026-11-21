@@ -1,6 +1,6 @@
 import "server-only";
 
-import { FREE_CLOSED, FREE_OPEN, PLANS, STORAGE_PACK, type PlanId } from "@/lib/plans";
+import { EARLIER, FREE_CLOSED, FREE_OPEN, PLANS, PLAN_DAYS, STORAGE_PACK, type PlanId } from "@/lib/plans";
 import { closedNote, spend } from "@/lib/server/budget";
 import { all, first, nowIso } from "@/lib/server/db";
 import type { User } from "@/lib/server/session";
@@ -42,8 +42,12 @@ export type Account = {
   storagePacks: number;
   /** Where a Lemon Squeezy subscriber manages or cancels (Paddle has one link for everyone). */
   portal: string | null;
-  /** Set when the plan is cancelled and still running: the day it stops. */
+  /** Set when the plan has a last day: a plan bought for 30 days, or a cancelled subscription still running. */
   planEnds: string | null;
+  /** True for a plan bought once for 30 days (nothing renews); its videos count from the day it began. */
+  pass: boolean;
+  /** True for a subscription from before the prices changed: it renews by itself at the earlier price and videos. */
+  earlier: boolean;
   /** True when a member upgraded to Pro and is still paying for Lite too. */
   paysForBoth: boolean;
   /** Free plan only: set while the Free plan is closed, or its videos wait for the next day or billing cycle
@@ -73,8 +77,22 @@ export async function accountOf(user: User): Promise<Account> {
   const plan = PLANS[id];
   const packs = id === "free" ? 0 : active.filter((s) => s.kind === "storage").reduce((n, s) => n + Math.max(1, s.quantity), 0);
   const made = usage.find((u) => u.month === month())?.clips ?? 0;
-  const sub = id === "pro" ? proSub : id === "lite" ? liteSub : undefined;
-  const left = Math.max(0, plan.videos - (started?.n ?? 0));
+  // A plan bought for 30 days is a row whose id begins "pass:" (see api/billing/lemonsqueezy). An earlier monthly
+  // subscription comes first when a member has both. Of several passes, the one ending soonest is the current one.
+  const mine = id === "free" ? [] : active.filter((s) => s.kind === id);
+  const earlierSub = mine.find((s) => !s.id.startsWith("pass:"));
+  const passes = mine.filter((s) => s.id.startsWith("pass:") && s.ends_at).sort((a, b) => a.ends_at!.localeCompare(b.ends_at!));
+  const pass = earlierSub ? undefined : passes[0];
+  const sub = earlierSub ?? pass;
+  // Each 30 days bought brings its videos at once: two Lite passes are 40 videos from the day the first began.
+  const videos = earlierSub && id !== "free" ? EARLIER[id].videos : pass ? plan.videos * passes.length : plan.videos;
+  let videosUsed = started?.n ?? 0;
+  if (pass) {
+    // Counted from the day the current pass began, so 30 days that cross the 1st don't give the videos twice.
+    const from = new Date(Date.parse(pass.ends_at!) - PLAN_DAYS * 86_400_000).toISOString();
+    videosUsed = (await first<{ n: number }>("select count(*) as n from jobs where user_id = ? and created_at >= ? and status != 'error' and paid_hours = 0", user.id, from))?.n ?? 0;
+  }
+  const left = Math.max(0, videos - videosUsed);
   // Free videos share a daily allowance between all members. Only looked up for a member who has a video left.
   const freeWaits = id !== "free" ? null : !FREE_OPEN ? FREE_CLOSED : left > 0 ? closedNote(await spend()) : null;
   return {
@@ -85,8 +103,8 @@ export async function accountOf(user: User): Promise<Account> {
     clips: plan.clips,
     clipsMade: made,
     clipsLeft: Math.max(0, plan.clips - made),
-    videos: plan.videos,
-    videosMade: started?.n ?? 0,
+    videos,
+    videosMade: videosUsed,
     videosLeft: freeWaits ? 0 : left,
     hoursBought: hours?.bought ?? 0,
     hoursLeft: Math.max(0, Math.round(((hours?.bought ?? 0) - (hours?.spent ?? 0)) * 100) / 100),
@@ -96,8 +114,11 @@ export async function accountOf(user: User): Promise<Account> {
     quality: plan.quality,
     storagePacks: packs,
     portal: sub?.portal_url ?? active.find((s) => s.portal_url)?.portal_url ?? null,
-    planEnds: sub?.ends_at ?? null,
-    paysForBoth: Boolean(proSub && liteSub),
+    planEnds: pass ? passes[passes.length - 1].ends_at : (sub?.ends_at ?? null),
+    pass: Boolean(pass),
+    earlier: Boolean(earlierSub),
+    // Only a subscription that renews can be paid for twice; a 30-day Lite simply runs out.
+    paysForBoth: id === "pro" && active.some((s) => s.kind === "lite" && !s.id.startsWith("pass:")),
     freeWaits,
   };
 }

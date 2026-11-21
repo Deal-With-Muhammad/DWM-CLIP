@@ -5,7 +5,7 @@ import { HeroVideo } from "@/components/hero-video";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TryBox } from "@/components/try-box";
-import { FREE, FREE_CLOSED_ON, FREE_OPEN, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, planRows, videosWord } from "@/lib/plans";
+import { FREE, FREE_CLOSED_ON, FREE_OPEN, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PLAN_DAYS, PRO, planRows, videosWord } from "@/lib/plans";
 import { first } from "@/lib/server/db";
 import { currentUser } from "@/lib/server/session";
 import { site } from "@/lib/site";
@@ -46,11 +46,14 @@ const FAQ = [
     : [
         {
           q: "Is there a free plan?",
-          a: `Not any more, and we're sorry about that. We opened with one, and on ${FREE_CLOSED_ON} we closed it: so many people joined in the first days that the clipping itself cost more than we could cover. Clips made on it are kept for ${FREE.keepDays} days and can still be downloaded. Plans start at $${LITE.price} a month, and the AI runs on your own key, which several services give away for free.`,
+          a: `Not any more, and we're sorry about that. We opened with one, and on ${FREE_CLOSED_ON} we closed it: so many people joined in the first days that the clipping itself cost more than we could cover. Clips made on it are kept for ${FREE.keepDays} days and can still be downloaded. Plans start at $${LITE.price} for ${PLAN_DAYS} days, and the AI runs on your own key, which several services give away for free.`,
         },
       ]),
   { q: "How long are my clips kept?", a: `On the Free plan, ${FREE.keepDays} days from when a clip is made, then it's deleted, so download the ones you want. On Lite and Pro your clips stay until you delete them.` },
-  { q: "Can I cancel?", a: "Yes, any time, from Settings. You keep your plan until the end of the month you paid for. If it didn't work for you, ask within 14 days of a payment and you get that payment back." },
+  {
+    q: "Does it renew by itself?",
+    a: `No. You pay once and the plan runs for ${PLAN_DAYS} days. When it ends nothing is charged; add another ${PLAN_DAYS} days from Settings whenever you want to carry on. If it didn't work for you, ask within 14 days of a payment and you get that payment back.`,
+  },
 ];
 
 export default async function Home() {
@@ -121,7 +124,7 @@ export default async function Home() {
                 <TryBox />
                 <p className="mt-3 text-[13.5px] text-white/65">
                   {FREE_OPEN ? `Free to try with your own AI key, no card: ${videosWord(FREE.videos)} a month. ` : "The AI runs on your own key. "}
-                  {LITE.videos} videos a month from ${LITE.price}.
+                  Plans from ${LITE.price} for {PLAN_DAYS} days, paid once.
                 </p>
               </div>
               <p className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] text-white/65">
@@ -200,11 +203,11 @@ export default async function Home() {
         <section id="pricing" className="scroll-mt-16 bg-surface">
           <div className="mx-auto w-full max-w-[1080px] px-4 py-16 sm:px-6">
             <h2 className="font-display text-[32px]">Pricing</h2>
-            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">{FREE_OPEN ? "Start free. " : ""}The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. Cancel any time.</p>
+            <p className="mt-2 max-w-[560px] text-[16px] leading-relaxed text-ink-2">{FREE_OPEN ? "Start free. " : ""}The AI runs on your own key on every plan, so you only pay for room to keep more clips, more clips from each video and longer videos. You pay once for {PLAN_DAYS} days and nothing renews by itself.</p>
             {made && made.clips >= 100 && (
               <p className="mt-5 max-w-[640px] rounded-2xl bg-brand-soft px-5 py-4 text-[15.5px] leading-relaxed text-ink">
                 <strong className="font-display text-[22px] font-semibold">{made.clips.toLocaleString("en-US")}</strong> clips made by {made.people.toLocaleString("en-US")} people since we opened on 18 November 2026.
-                {!FREE_OPEN && ` Nearly all of them were made on the free plan, which is why it closed on ${FREE_CLOSED_ON}: that much clipping cost more than we could cover. Thank you for using it, and sorry to those who came for it. Plans start at $${LITE.price} a month.`}
+                {!FREE_OPEN && ` Nearly all of them were made on the free plan, which is why it closed on ${FREE_CLOSED_ON}: that much clipping cost more than we could cover. Thank you for using it, and sorry to those who came for it. Plans start at $${LITE.price} for ${PLAN_DAYS} days.`}
               </p>
             )}
             <div className="mt-9 grid gap-4 md:grid-cols-3">
@@ -218,7 +221,7 @@ export default async function Home() {
                     </p>
                     <p className="mt-2 font-display text-[38px] leading-none">
                       ${plan.price}
-                      {plan.price > 0 && <span className="text-[16px] font-normal text-muted"> /month</span>}
+                      {plan.price > 0 && <span className="text-[16px] font-normal text-muted"> for {PLAN_DAYS} days</span>}
                     </p>
                     <p className="mt-2 text-[14px] text-muted">{line}</p>
                     <ul className="mt-5 flex-1 space-y-2.5 text-[15px] text-ink-2">
@@ -237,7 +240,7 @@ export default async function Home() {
               })}
             </div>
             <p className="mt-5 text-[14px] text-muted">
-              Need more? Buy video hours on any plan, from ${HOUR_PACKS[0].price} for {HOUR_PACKS[0].hours} hours, paid once: clip videos up to {HOURS_PER_VIDEO} hours long, and only the length you clip is used. Add {formatBytes(STORAGE_PACK.bytes)} of storage to Lite or Pro for ${STORAGE_PACK.price} a month.
+              Need more? Buy video hours on any plan, from ${HOUR_PACKS[0].price} for {HOUR_PACKS[0].hours} hours, paid once: clip videos up to {HOURS_PER_VIDEO} hours long, and only the length you clip is used.
             </p>
           </div>
         </section>

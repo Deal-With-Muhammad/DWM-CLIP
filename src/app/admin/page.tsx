@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
+import { EARLIER, LITE, PRO, STORAGE_PACK, formatBytes } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { BUDGET, cycle, spend } from "@/lib/server/budget";
 import { all, first } from "@/lib/server/db";
@@ -55,8 +55,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         (select count(*) from jobs where status = 'done') as done, (select count(*) from jobs where status = 'done' and tokens > 0) as aiOk`,
       week,
     ),
-    all<{ kind: string; n: number }>(
-      "select kind, coalesce(sum(quantity), 0) as n from subscriptions where status in ('active', 'trialing', 'on_trial', 'past_due') or (status = 'cancelled' and ends_at > ?) group by kind",
+    all<{ kind: string; n: number; passes: number }>(
+      "select kind, coalesce(sum(quantity), 0) as n, coalesce(sum(case when id like 'pass:%' then 1 else 0 end), 0) as passes from subscriptions where status in ('active', 'trialing', 'on_trial', 'past_due') or (status = 'cancelled' and ends_at > ?) group by kind",
       now,
     ),
     all<Day>("select substr(created_at, 1, 10) as day, count(*) as n from users where created_at > ? group by day", since),
@@ -87,7 +87,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const proCount = subs.find((s) => s.kind === "pro")?.n ?? 0;
   const packs = subs.find((s) => s.kind === "storage")?.n ?? 0;
   const liteCount = subs.find((s) => s.kind === "lite")?.n ?? 0;
-  const mrr = proCount * PRO.price + liteCount * LITE.price + packs * STORAGE_PACK.price;
+  // Plans bought for 30 days at today's prices, and subscriptions from before the prices changed at theirs.
+  const passesOf = (kind: string) => subs.find((s) => s.kind === kind)?.passes ?? 0;
+  const mrr =
+    passesOf("pro") * PRO.price + (proCount - passesOf("pro")) * EARLIER.pro.price + passesOf("lite") * LITE.price + (liteCount - passesOf("lite")) * EARLIER.lite.price + packs * STORAGE_PACK.price;
 
   return (
     <>
@@ -97,7 +100,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         <section className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile label="Members" value={t.users} sub={`${t.users7} new this week`} />
-          <Tile label="Paying members" value={proCount + liteCount} sub={`$${mrr}/month: ${proCount} Pro, ${liteCount} Lite, ${packs} storage`} />
+          <Tile label="Paying members" value={proCount + liteCount} sub={`about $${mrr} a month: ${proCount} Pro, ${liteCount} Lite (${passesOf("pro") + passesOf("lite")} bought for 30 days), ${packs} storage`} />
           <Tile label="Video hours sold" value={hours?.sold ?? 0} sub={`${hours?.packs ?? 0} pack${hours?.packs === 1 ? "" : "s"} to ${hours?.buyers ?? 0} member${hours?.buyers === 1 ? "" : "s"}`} />
           <Tile label="Active this week" value={t.active7} sub="members who clipped a video" />
           <Tile label="Clips made" value={t.clips} sub={`${t.jobs} video${t.jobs === 1 ? "" : "s"}, ${t.failed} failed`} />

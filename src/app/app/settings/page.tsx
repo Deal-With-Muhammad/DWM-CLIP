@@ -2,11 +2,11 @@ import { Check } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
-import { FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PRO, STORAGE_PACK, formatBytes, hoursLeftWord, planRows } from "@/lib/plans";
+import { EARLIER, FREE, HOUR_PACKS, HOURS_PER_VIDEO, LITE, PLAN_DAYS, PRO, STORAGE_PACK, formatBytes, hoursLeftWord, planRows } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { checkoutConfig, paymentsEnabled, portalUrl, provider, type Kind } from "@/lib/server/billing";
 import { keyInfo } from "@/lib/server/keys";
-import { hoursCheckout, lemonCheckout } from "@/lib/server/lemonsqueezy";
+import { hoursCheckout, lemonCheckout, passCheckout } from "@/lib/server/lemonsqueezy";
 import { currentUser, isAdminEmail } from "@/lib/server/session";
 import { site } from "@/lib/site";
 
@@ -23,7 +23,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const lemon = provider() === "lemonsqueezy";
   const paddle = checkoutConfig();
   const checkout = { sandbox: paddle.sandbox, token: paddle.token, userId: user.id, email: user.email };
-  const link = (kind: Kind) => (lemon ? lemonCheckout(kind, user.id) : null);
+  // A plan is bought once for 30 days; only extra storage is still a subscription.
+  const link = (kind: Kind) => (lemon ? (kind === "storage" ? lemonCheckout(kind, user.id) : passCheckout(kind, user.id)) : null);
   const canBuy = (kind: Kind) => (lemon ? Boolean(link(kind)) : paymentsEnabled(kind));
   const portal = account.portal ?? (lemon ? null : portalUrl());
   const paid = account.plan !== "free";
@@ -63,7 +64,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <p className="mt-2 text-[14.5px] leading-relaxed text-muted">
             Every plan clips with your own AI key, so there is no charge for the AI here. A plan pays for room to keep your clips, more clips from each video, and more of a long video at a time.
           </p>
-          {account.planEnds && paid && <p className="mt-2 text-[14px] text-warn-ink">Your plan is cancelled and stays on until {day(account.planEnds)}.</p>}
+          {account.planEnds && paid && (
+            <p className="mt-2 text-[14px] text-warn-ink">
+              {account.pass
+                ? `Your ${account.planName} plan runs until ${day(account.planEnds)}. Nothing renews by itself: add ${PLAN_DAYS} more days whenever you like.`
+                : `Your plan is cancelled and stays on until ${day(account.planEnds)}.`}
+            </p>
+          )}
+          {account.earlier && account.plan !== "free" && (
+            <p className="mt-2 text-[14px] text-muted">
+              You joined at the earlier price and keep it: ${EARLIER[account.plan].price} a month for {EARLIER[account.plan].videos} videos, renewing until you cancel.
+            </p>
+          )}
           {account.paysForBoth && (
             <p className="mt-2 rounded-xl bg-warn-soft px-3.5 py-2.5 text-[14px] text-warn-ink">You&apos;re on Pro and still paying for Lite. Cancel Lite with &quot;Manage or cancel&quot; below so you aren&apos;t charged for both.</p>
           )}
@@ -72,6 +84,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             {[FREE, LITE, PRO].map((p) => {
               const mine = p.id === account.plan;
               const up = (p.id === "lite" && account.plan === "free") || (p.id === "pro" && account.plan !== "pro");
+              // A member on a 30-day plan can add another 30 days to it before it runs out.
+              const more = mine && account.pass;
               return (
                 <div key={p.id} className={`flex flex-col rounded-xl p-4 ${mine ? "bg-brand-soft" : "bg-canvas"}`}>
                   <p className="flex items-center gap-2 text-[15px] font-semibold">
@@ -80,7 +94,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   </p>
                   <p className="mt-1 font-display text-[26px] leading-none">
                     ${p.price}
-                    {p.price > 0 && <span className="text-[14px] font-normal text-muted"> /month</span>}
+                    {p.price > 0 && <span className="text-[14px] font-normal text-muted"> for {PLAN_DAYS} days</span>}
                   </p>
                   <ul className="mt-3.5 flex-1 space-y-1.5 text-[13.5px] text-ink-2">
                     {planRows(p).map((r) => (
@@ -90,20 +104,25 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       </li>
                     ))}
                   </ul>
-                  {up && p.id !== "free" && <div className="mt-4">{buy(p.id, `Get ${p.name}`, p.id === "lite") ?? <p className="text-[12.5px] text-muted">Card payments open soon.</p>}</div>}
+                  {(up || more) && p.id !== "free" && (
+                    <div className="mt-4">{buy(p.id, more ? `Add ${PLAN_DAYS} more days` : `Get ${p.name} for ${PLAN_DAYS} days`, p.id === "lite" || more) ?? <p className="text-[12.5px] text-muted">Card payments open soon.</p>}</div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
-            {paid && buy("storage", `Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`, true)}
+            {/* Extra storage renews every month, so it is only offered beside a subscription that does too. */}
+            {paid && account.earlier && buy("storage", `Add ${formatBytes(STORAGE_PACK.bytes)} for $${STORAGE_PACK.price}/month`, true)}
             {paid && portal && (
               <a href={portal} target="_blank" rel="noreferrer" className="text-[14.5px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
                 Manage or cancel
               </a>
             )}
-            <p className="text-[12.5px] text-muted">Cancel any time. Payment is handled by {site.seller}, our reseller. 14-day refund.</p>
+            <p className="text-[12.5px] text-muted">
+              You pay once for {PLAN_DAYS} days and nothing renews by itself. Payment is handled by {site.seller}, our reseller. 14-day refund.
+            </p>
           </div>
         </section>
 

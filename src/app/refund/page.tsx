@@ -5,10 +5,10 @@ export const metadata = { title: "Refund policy" };
 
 export default function Refund() {
   return (
-    <Legal title="Refund policy" updated="18 November 2026">
+    <Legal title="Refund policy" updated="22 November 2026">
       <section>
         <h2>14-day refund</h2>
-        <p>If DWM Clip Pro or extra storage didn&apos;t work for you, ask within 14 days of a payment and that payment is refunded in full. You don&apos;t need to give a reason.</p>
+        <p>If a DWM Clip plan, video hours or extra storage didn&apos;t work for you, ask within 14 days of a payment and that payment is refunded in full. You don&apos;t need to give a reason.</p>
       </section>
       <section>
         <h2>How to ask</h2>
@@ -18,7 +18,7 @@ export default function Refund() {
       </section>
       <section>
         <h2>Cancelling</h2>
-        <p>You can cancel a subscription any time from Settings. It stays active until the end of the month already paid for and isn&apos;t charged again. Cancelling doesn&apos;t delete your clips.</p>
+        <p>A plan bought for 30 days ends by itself and is never charged again, so there is nothing to cancel. A monthly subscription from before 22 November 2026 can be cancelled any time from Settings: it stays active until the end of the month already paid for and isn&apos;t charged again. Neither deletes your clips.</p>
       </section>
       <section>
         <h2>After 14 days</h2>

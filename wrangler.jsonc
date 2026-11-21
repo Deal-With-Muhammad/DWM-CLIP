@@ -30,6 +30,13 @@
     "LEMONSQUEEZY_PRODUCT_LITE": "1533120",
     "LEMONSQUEEZY_PRODUCT_PRO": "1533076",
     "LEMONSQUEEZY_PRODUCT_STORAGE": "1533077",
+    // A plan for 30 days, paid once (product 1534985, "DWM Clip Plan, 30 days"): what new members buy since
+    // 22 November 2026, Lite $5 and Pro $19. "variant id:plan" for each, and each variant's checkout link.
+    // The LITE and PRO subscription products above stay for the members who subscribed before that.
+    "LEMONSQUEEZY_PRODUCT_PASS": "1534985",
+    "LEMONSQUEEZY_PASS_VARIANTS": "2387589:lite,2387591:pro",
+    "LEMONSQUEEZY_LINK_PASS_LITE": "https://pay.dealwithmuhammad.com/checkout/buy/fd238aaf-03e3-4879-8bf6-f6d8a5b46099?enabled=2387589",
+    "LEMONSQUEEZY_LINK_PASS_PRO": "https://pay.dealwithmuhammad.com/checkout/buy/1db6bf64-f5ff-436b-bbc9-3f35f34c8920?enabled=2387591",
     // Video hours, paid once (product 1534465): one checkout link per pack, and "variant id:hours" for each pack.
     "LEMONSQUEEZY_LINK_HOURS_10": "https://pay.dealwithmuhammad.com/checkout/buy/820ef20f-b4ef-44e5-be4b-e12047ec32ba",
     "LEMONSQUEEZY_LINK_HOURS_30": "https://pay.dealwithmuhammad.com/checkout/buy/16520a18-b3bf-4752-9775-92b0057b053c",

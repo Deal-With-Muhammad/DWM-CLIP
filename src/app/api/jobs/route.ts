@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { cleanLook } from "@/lib/look";
 import { videoUrl } from "@/lib/link";
-import { ENGINE_LAYOUT, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, RETIRED_MODELS, STYLES } from "@/lib/plans";
+import { ENGINE_LAYOUT, HOURS_CLIPS_PER_VIDEO, HOURS_PER_VIDEO, LAYOUTS, LITE, PLAN_DAYS, RETIRED_MODELS, STYLES } from "@/lib/plans";
 import { accountOf } from "@/lib/server/account";
 import { first, nowIso, run } from "@/lib/server/db";
 import { ALL_PLACES, engineReady, startJob } from "@/lib/server/engine";
@@ -47,8 +47,10 @@ export async function POST(req: Request) {
     return fail(
       402,
       account.plan === "free"
-        ? `${account.freeWaits ?? `You've used your free ${account.videos === 1 ? "video" : `${account.videos} videos`} this month.`} ${account.freeWaits ? "New videos need a plan" : "Pick a plan to keep clipping"}: Lite is $${LITE.price} a month for ${LITE.videos} videos, or buy video hours from $3.`
-        : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`,
+        ? `${account.freeWaits ?? `You've used your free ${account.videos === 1 ? "video" : `${account.videos} videos`} this month.`} ${account.freeWaits ? "New videos need a plan" : "Pick a plan to keep clipping"}: Lite is $${LITE.price} for ${PLAN_DAYS} days (${LITE.videos} videos), or buy video hours from $3.`
+        : account.pass
+          ? `You've clipped all ${account.videos} videos of these ${PLAN_DAYS} days. Add ${PLAN_DAYS} more days in Settings, or use video hours.`
+          : `You've clipped all ${account.videos} videos your plan gives this month. It resets on the 1st.`,
       { upgrade: account.plan !== "pro" },
     );
   }

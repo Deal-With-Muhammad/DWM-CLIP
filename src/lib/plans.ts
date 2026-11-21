@@ -12,7 +12,7 @@ export type PlanId = "free" | "lite" | "pro";
 export type Plan = {
   id: PlanId;
   name: string;
-  /** US dollars a month. */
+  /** US dollars for PLAN_DAYS days, paid once. */
   price: number;
   storage: number;
   /** Clips per calendar month. The member's storage is the real limit on every plan; this is only a
@@ -34,8 +34,21 @@ export type Plan = {
 };
 
 export const FREE: Plan = { id: "free", name: "Free", price: 0, storage: 200 * MB, clips: 100, videos: 1, clipsPerVideo: 2, maxHours: 0.5, jobsAtOnce: 1, quality: 720, keepDays: 7 };
-export const LITE: Plan = { id: "lite", name: "Lite", price: 2, storage: 1 * GB, clips: 150, videos: 25, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080, keepDays: 0 };
-export const PRO: Plan = { id: "pro", name: "Pro", price: 9, storage: 5 * GB, clips: 600, videos: 80, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, keepDays: 0 };
+export const LITE: Plan = { id: "lite", name: "Lite", price: 5, storage: 1 * GB, clips: 150, videos: 20, clipsPerVideo: 5, maxHours: 1, jobsAtOnce: 1, quality: 1080, keepDays: 0 };
+export const PRO: Plan = { id: "pro", name: "Pro", price: 19, storage: 5 * GB, clips: 600, videos: 60, clipsPerVideo: 10, maxHours: 3, jobsAtOnce: 2, quality: 1080, keepDays: 0 };
+
+/**
+ * A paid plan is bought once and runs this many days; nothing renews by itself (the owner's decision, 22 November
+ * 2026). Its videos are counted from the day it began. The prices cover what a member can cost: a paid video uses
+ * about 14 cents of container time, so 20 Lite videos cost under $3 and 60 Pro videos under $9, and Lemon Squeezy
+ * keeps 5% + 50 cents of each payment.
+ */
+export const PLAN_DAYS = 30;
+/**
+ * Members who subscribed before the prices changed (Lite at $2 a month, Pro at $9, renewing by itself) keep that
+ * price and these videos a calendar month, for as long as their subscription runs.
+ */
+export const EARLIER = { lite: { price: 2, videos: 25 }, pro: { price: 9, videos: 80 } } as const;
 
 /**
  * Whether the Free plan takes new videos. Closed on 21 November 2026 (the owner's decision): in its first four
@@ -122,14 +135,13 @@ export function roomFor(bytes: number) {
 export function planRows(p: Plan) {
   if (p.id === "free" && !FREE_OPEN) return [`Closed to new videos since ${FREE_CLOSED_ON}`, `Clips already made are kept for ${p.keepDays} days`, "Watch and download them any time"];
   return [
-    `${videosWord(p.videos)} a month`,
+    p.price > 0 ? `${videosWord(p.videos)} in ${PLAN_DAYS} days` : `${videosWord(p.videos)} a month`,
     `Up to ${lengthWord(p.maxHours)} of each video`,
     `${p.clipsPerVideo} clips from one video`,
     `${formatBytes(p.storage)} of storage, ${roomFor(p.storage)}`,
     p.keepDays ? `Clips kept for ${p.keepDays} days` : "Clips kept until you delete them",
     ...(p.quality >= 1080 ? ["Sharper 1080p source"] : []),
     ...(p.jobsAtOnce > 1 ? ["Two videos at once"] : []),
-    ...(p.id === "free" ? [] : ["Add 10 GB more whenever you need it"]),
   ];
 }
 
